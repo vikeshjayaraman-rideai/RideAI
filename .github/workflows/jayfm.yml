@@ -1,0 +1,83 @@
+# .github/workflows/jayfm.yml
+# Jay FM Content & Audio Generation
+# Runs automatically on schedule
+
+name: Jay FM Generator
+
+on:
+  schedule:
+    # 5:00 AM IST = 11:30 PM UTC (previous day)
+    - cron: '30 23 * * *'  # Morning content
+    # 5:30 AM IST = 12:00 AM UTC
+    - cron: '0 0 * * *'    # Morning audio
+    # 11:00 AM IST = 5:30 AM UTC
+    - cron: '30 5 * * *'   # Afternoon content
+    # 11:30 AM IST = 6:00 AM UTC
+    - cron: '0 6 * * *'    # Afternoon audio
+  
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run'
+        required: true
+        default: 'morning-content'
+        type: choice
+        options:
+          - morning-content
+          - morning-audio
+          - afternoon-content
+          - afternoon-audio
+          - all-content
+          - all-audio
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Setup Google credentials
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT }}' > google-services-admin.json
+
+      - name: Create .env file
+        run: |
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+          echo "FIREBASE_PROJECT_ID=rideai-84dff" >> .env
+
+      - name: Morning Content (5AM IST)
+        if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning-content' || github.event.inputs.task == 'all-content'
+        run: node scripts/generateJayFMContent.js --today --morning
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Morning Audio (5:30AM IST)
+        if: github.event.schedule == '0 0 * * *' || github.event.inputs.task == 'morning-audio' || github.event.inputs.task == 'all-audio'
+        run: node scripts/generateFMAudio.js --today --morning
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Afternoon Content (11AM IST)
+        if: github.event.schedule == '30 5 * * *' || github.event.inputs.task == 'afternoon-content' || github.event.inputs.task == 'all-content'
+        run: node scripts/generateJayFMContent.js --today --afternoon
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Afternoon Audio (11:30AM IST)
+        if: github.event.schedule == '0 6 * * *' || github.event.inputs.task == 'afternoon-audio' || github.event.inputs.task == 'all-audio'
+        run: node scripts/generateFMAudio.js --today --afternoon
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
