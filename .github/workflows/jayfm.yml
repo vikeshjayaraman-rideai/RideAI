@@ -2,27 +2,31 @@ name: Jay FM Generator
 
 on:
   schedule:
-    - cron: '30 23 * * *'
-    - cron: '0 0 * * *'
-    - cron: '30 5 * * *'
-    - cron: '0 6 * * *'
+    - cron: '30 23 * * *'  # 5:00 AM IST - morning slots 1
+    - cron: '45 23 * * *'  # 5:15 AM IST - morning slots 2
+    - cron: '0 0 * * *'    # 5:30 AM IST - morning audio
+    - cron: '30 5 * * *'   # 11:00 AM IST - afternoon slots 1
+    - cron: '45 5 * * *'   # 11:15 AM IST - afternoon slots 2
+    - cron: '0 6 * * *'    # 11:30 AM IST - afternoon audio
   workflow_dispatch:
     inputs:
       task:
         description: 'Task to run'
         required: true
-        default: 'morning_content'
+        default: 'morning1'
         type: choice
         options:
-          - morning_content
+          - morning1
+          - morning2
           - morning_audio
-          - afternoon_content
+          - afternoon1
+          - afternoon2
           - afternoon_audio
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -39,29 +43,55 @@ jobs:
 
       - name: Setup credentials
         run: |
-          echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_B64 }}" | base64 --decode > google-services-admin.json
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
-          echo "Credentials setup done"
-          python3 -c "import json; json.load(open('google-services-admin.json')); print('JSON valid!')" 
+          echo "$GOOGLE_SERVICE_ACCOUNT" | base64 --decode > google-services-admin.json
+          echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_B64 }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-      - name: Debug - check files
+      # Morning slots 1 (5:00AM IST) - rhythms, rasi_palan, morning_news, thalaivar
+      - name: Morning Slots 1
+        if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning1'
         run: |
-          ls scripts/
-          echo "Config check:"
-          node -e "const c = require('./scripts/jayFMConfig'); console.log('Config OK, slots:', c.SCHEDULE?.length);"
+          node scripts/generateJayFMContent.js --today --slot=rhythms
+          node scripts/generateJayFMContent.js --today --slot=rasi_palan
+          node scripts/generateJayFMContent.js --today --slot=morning_news
+          node scripts/generateJayFMContent.js --today --slot=thalaivar
 
-      - name: Morning Content
-        if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning_content'
-        run: node scripts/generateJayFMContent.js --today --morning
+      # Morning slots 2 (5:15AM IST) - health, movie_review, agriculture, travel
+      - name: Morning Slots 2
+        if: github.event.schedule == '45 23 * * *' || github.event.inputs.task == 'morning2'
+        run: |
+          node scripts/generateJayFMContent.js --today --slot=health
+          node scripts/generateJayFMContent.js --today --slot=movie_review
+          node scripts/generateJayFMContent.js --today --slot=agriculture
+          node scripts/generateJayFMContent.js --today --slot=travel
 
+      # Morning audio (5:30AM IST)
       - name: Morning Audio
         if: github.event.schedule == '0 0 * * *' || github.event.inputs.task == 'morning_audio'
         run: node scripts/generateFMAudio.js --today --morning
 
-      - name: Afternoon Content
-        if: github.event.schedule == '30 5 * * *' || github.event.inputs.task == 'afternoon_content'
-        run: node scripts/generateJayFMContent.js --today --afternoon
+      # Afternoon slots 1 (11:00AM IST)
+      - name: Afternoon Slots 1
+        if: github.event.schedule == '30 5 * * *' || github.event.inputs.task == 'afternoon1'
+        run: |
+          node scripts/generateJayFMContent.js --today --slot=local_news
+          node scripts/generateJayFMContent.js --today --slot=weather
+          node scripts/generateJayFMContent.js --today --slot=comedy
+          node scripts/generateJayFMContent.js --today --slot=science
 
+      # Afternoon slots 2 (11:15AM IST)
+      - name: Afternoon Slots 2
+        if: github.event.schedule == '45 5 * * *' || github.event.inputs.task == 'afternoon2'
+        run: |
+          node scripts/generateJayFMContent.js --today --slot=evening_news
+          node scripts/generateJayFMContent.js --today --slot=horror
+          node scripts/generateJayFMContent.js --today --slot=love
+          node scripts/generateJayFMContent.js --today --slot=night
+          node scripts/generateJayFMContent.js --today --slot=night_music
+
+      # Afternoon audio (11:30AM IST)
       - name: Afternoon Audio
         if: github.event.schedule == '0 6 * * *' || github.event.inputs.task == 'afternoon_audio'
         run: node scripts/generateFMAudio.js --today --afternoon
