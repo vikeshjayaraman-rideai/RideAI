@@ -1,0 +1,519 @@
+import React, {useState, useEffect, useRef} from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity,
+  StatusBar, Alert, Dimensions, ScrollView,
+} from 'react-native';
+import MapView, {Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
+import {colors} from '../theme/colors';
+import {
+  requestLocationPermission, getCurrentLocation, watchLocation,
+  clearLocationWatch, checkRouteStatus, getNextUpcomingStop,
+} from '../services/locationService';
+import {endTrip} from '../services/tripService';
+import {getFullRoutePolyline, RoutePoint} from '../services/directionsService';
+import {checkRouteStatusWithPolyline} from '../services/locationService';
+
+
+
+
+const {width, height} = Dimensions.get('window');
+
+const STOP_ICONS: Record<string, string> = {
+  meeting: '🚩', checkpoint: '📍', tea: '☕', lunch: '🍽️',
+  fuel: '⛽', hidden_gem: '💎', destination: '🏁',
+  stay: '🏨', food_stop: '🍽️',
+};
+
+const STOP_COLORS: Record<string, string> = {
+  meeting: '#7C3AED', checkpoint: '#2563EB', tea: '#D97706',
+  lunch: '#DC2626', fuel: '#059669', hidden_gem: '#DB2777',
+  destination: '#FF6B35', stay: '#0891B2', food_stop: '#DC2626',
+};
+
+const darkMapStyle = [
+  {elementType: 'geometry', stylers: [{color: '#1d2c4d'}]},
+  {elementType: 'labels.text.fill', stylers: [{color: '#8ec3b9'}]},
+  {elementType: 'labels.text.stroke', stylers: [{color: '#1a3646'}]},
+  {featureType: 'road', elementType: 'geometry', stylers: [{color: '#304a7d'}]},
+  {featureType: 'road.highway', elementType: 'geometry', stylers: [{color: '#2c6675'}]},
+  {featureType: 'water', elementType: 'geometry', stylers: [{color: '#0e1626'}]},
+];
+
+const ActiveRideScreen = ({route, navigation}: any) => {
+  const trip = route.params?.trip;
+  const mapRef = useRef<MapView>(null);
+  const [currentLocation, setCurrentLocation] = useState<any>(null);
+  const [routeStatus, setRouteStatus] = useState<any>(null);
+  const [nextStopInfo, setNextStopInfo] = useState<any>(null);
+  const [watchId, setWatchId] = useState<number | null>(null);
+  const [showStopList, setShowStopList] = useState(false);
+  const [roadPolyline, setRoadPolyline] = useState<RoutePoint[]>([]);
+  const [loadingRoute, setLoadingRoute] = useState(true);
+
+  const validStops = (trip?.stops || []).filter(
+    (s: any) => s.lat && s.lng && s.lat !== 0 && s.lng !== 0,
+  );
+
+
+
+  const polylineCoords = validStops.map((s: any) => ({
+    latitude: s.lat, longitude: s.lng,
+  }));
+
+  useEffect(() => {
+  loadRoadRoute();
+}, []);
+
+const loadRoadRoute = async () => {
+  setLoadingRoute(true);
+  try {
+    const points = await getFullRoutePolyline(trip.stops);
+    setRoadPolyline(points);
+  } catch (e) {
+    console.error('Route load error:', e);
+  }
+  setLoadingRoute(false);
+};
+
+  const startTracking = async () => {
+    const granted = await requestLocationPermission();
+    if (!granted) {
+      Alert.alert('Permission Denied', 'Location permission is required.');
+      return;
+    }
+   try {
+  const initial = await getCurrentLocation();
+  setCurrentLocation(initial);
+  setRouteStatus(
+    roadPolyline.length > 0
+      ? checkRouteStatusWithPolyline(initial, roadPolyline, trip.stops)
+      : checkRouteStatus(initial, trip.stops),
+  );
+  setNextStopInfo(getNextUpcomingStop(initial, trip.stops));
+  centerMap(initial);
+} catch (e) {}
+
+    const id = watchLocation(
+  (location) => {
+    setCurrentLocation(location);
+    setRouteStatus(
+      roadPolyline.length > 0
+        ? checkRouteStatusWithPolyline(location, roadPolyline, trip.stops)
+        : checkRouteStatus(location, trip.stops),
+    );
+    setNextStopInfo(getNextUpcomingStop(location, trip.stops));
+  },
+  (error) => console.error('Location error:', error),
+);
+    setWatchId(id);
+  };
+
+  const centerMap = (loc: any) => {    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: loc.lat,
+        longitude: loc.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 1000);
+    }
+  };
+
+  const handleRecenter = () => {
+    if (currentLocation) centerMap(currentLocation);
+  };
+
+  // Navigate map to show a specific stop
+  const handleNavigateToStop = (stop: any) => {
+    setShowStopList(false);
+    if (mapRef.current && stop.lat && stop.lng) {
+      mapRef.current.animateToRegion({
+        latitude: stop.lat,
+        longitude: stop.lng,
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03,
+      }, 1000);
+    }
+  };
+
+  // Show both current location and next stop on map
+  const handleViewNextStop = () => {
+    if (!nextStopInfo?.nextStop || !currentLocation || !mapRef.current) return;
+    const coords = [
+      {latitude: currentLocation.lat, longitude: currentLocation.lng},
+      {latitude: nextStopInfo.nextStop.lat, longitude: nextStopInfo.nextStop.lng},
+    ];
+    mapRef.current.fitToCoordinates(coords, {
+      edgePadding: {top: 100, right: 60, bottom: 250, left: 60},
+      animated: true,
+    });
+  };
+
+  const handleEndTrip = () => {
+    Alert.alert(
+      '🏁 End Trip?',
+      'This will mark the trip as completed and stop GPS tracking.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'End Trip',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await endTrip(trip.id);
+              if (watchId !== null) clearLocationWatch(watchId);
+              Alert.alert('🎉 Trip Completed!', 'Great ride! See you on the next one.');
+              navigation.goBack();
+            } catch (e) {
+              Alert.alert('Error', 'Could not end trip.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const initialRegion = currentLocation
+    ? {latitude: currentLocation.lat, longitude: currentLocation.lng, latitudeDelta: 0.05, longitudeDelta: 0.05}
+    : validStops.length > 0
+    ? {latitude: validStops[0].lat, longitude: validStops[0].lng, latitudeDelta: 0.5, longitudeDelta: 0.5}
+    : {latitude: 12.9716, longitude: 77.5946, latitudeDelta: 5, longitudeDelta: 5};
+
+  const statusConfig = {
+    on_track: {label: '✅ On Track', color: colors.success},
+    off_route: {label: '⚠️ Off Route', color: colors.danger},
+    near_stop: {label: '📍 At Checkpoint', color: colors.primary},
+    unknown: {label: '🛰️ Locating...', color: colors.textMuted},
+  };
+  const currentStatus = statusConfig[routeStatus?.status as keyof typeof statusConfig] || statusConfig.unknown;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        initialRegion={initialRegion}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
+        customMapStyle={darkMapStyle}>
+
+       {/* Planned route — actual roads */}
+{roadPolyline.length > 1 ? (
+  <Polyline
+    coordinates={roadPolyline.map(p => ({latitude: p.lat, longitude: p.lng}))}
+    strokeColor={colors.primary}
+    strokeWidth={4}
+  />
+) : polylineCoords.length > 1 && (
+  <Polyline
+    coordinates={polylineCoords}
+    strokeColor={colors.primary}
+    strokeWidth={3}
+    lineDashPattern={[8, 6]}
+  />
+)}
+        {/* Stop markers with number + name labels */}
+        {validStops.map((stop: any, index: number) => {
+          const isPassed = nextStopInfo?.passedStops?.includes(index);
+          const isNext = nextStopInfo?.nextIndex === index;
+          return (
+            <Marker
+              key={stop.id}
+              coordinate={{latitude: stop.lat, longitude: stop.lng}}
+              title={`#${index + 1} ${stop.name}`}
+              description={stop.time}>
+              <View style={styles.markerWrapper}>
+                <View style={[
+                  styles.markerContainer,
+                  {backgroundColor: STOP_COLORS[stop.type]},
+                  isPassed && styles.markerPassed,
+                  isNext && styles.markerNext,
+                ]}>
+                  <Text style={styles.markerIcon}>{STOP_ICONS[stop.type] || '📍'}</Text>
+                  <View style={styles.markerNumberBadge}>
+                    <Text style={styles.markerNumberText}>{index + 1}</Text>
+                  </View>
+                </View>
+                <View style={styles.markerLabel}>
+                  <Text style={styles.markerLabelText} numberOfLines={1}>
+                    {stop.name.length > 18 ? stop.name.substring(0, 18) + '…' : stop.name}
+                  </Text>
+                </View>
+              </View>
+            </Marker>
+          );
+        })}
+
+        {/* Current location — rider avatar */}
+        {currentLocation && (
+          <Marker
+            coordinate={{latitude: currentLocation.lat, longitude: currentLocation.lng}}
+            title="You are here"
+            anchor={{x: 0.5, y: 0.5}}
+            rotation={currentLocation.heading || 0}>
+            <View style={styles.riderMarker}>
+              <View style={styles.riderRing} />
+              <View style={styles.riderAvatar}>
+                <Text style={styles.riderAvatarIcon}>🏍️</Text>
+              </View>
+            </View>
+          </Marker>
+        )}
+      </MapView>
+ {loadingRoute && (
+        <View style={styles.routeLoadingBadge}>
+          <Text style={styles.routeLoadingText}>🗺️ Loading road route...</Text>
+        </View>
+      )}
+
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backArrow}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.topBarTitle}>
+          <Text style={styles.tripTitle} numberOfLines={1}>{trip?.title}</Text>
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE TRACKING</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.listBtn} onPress={() => setShowStopList(true)}>
+          <Text style={styles.listBtnIcon}>📋</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Status floating card */}
+      <View style={styles.statusCard}>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusBadge, {backgroundColor: currentStatus.color + '33'}]}>
+            <Text style={[styles.statusBadgeText, {color: currentStatus.color}]}>
+              {currentStatus.label}
+            </Text>
+          </View>
+          {nextStopInfo?.nextStop && (
+            <TouchableOpacity style={styles.nextStopBtn} onPress={handleViewNextStop}>
+              <Text style={styles.nextStopLabel}>Next</Text>
+              <Text style={styles.nextStopText} numberOfLines={1}>
+                #{nextStopInfo.nextIndex + 1} {nextStopInfo.nextStop.name}
+              </Text>
+              <Text style={styles.nextStopArrow}>🗺️</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {routeStatus?.distanceToNearestStop >= 0 && (
+          <Text style={styles.distanceText}>
+            {routeStatus.distanceToNearestStop.toFixed(1)} km to nearest checkpoint
+            {routeStatus.status === 'off_route' &&
+              ` • ${routeStatus.distanceFromRoute.toFixed(1)} km off planned route`}
+          </Text>
+        )}
+        {currentLocation?.speed > 0 && (
+          <Text style={styles.speedText}>
+            🏍️ Speed: {Math.round(currentLocation.speed * 3.6)} km/h
+          </Text>
+        )}
+      </View>
+
+      {/* Bottom controls */}
+      <View style={styles.bottomControls}>
+        <TouchableOpacity style={styles.recenterBtn} onPress={handleRecenter}>
+          <Text style={styles.recenterIcon}>🎯</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.endTripBtn} onPress={handleEndTrip}>
+          <Text style={styles.endTripText}>🏁 End Trip</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stop List Modal */}
+      {showStopList && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📋 Checkpoints</Text>
+              <TouchableOpacity onPress={() => setShowStopList(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{paddingBottom: 20}}>
+              {validStops.map((stop: any, index: number) => {
+                const isPassed = nextStopInfo?.passedStops?.includes(index);
+                const isNext = nextStopInfo?.nextIndex === index;
+                return (
+                  <TouchableOpacity
+                    key={stop.id}
+                    style={[styles.stopListItem, isNext && styles.stopListItemActive]}
+                    onPress={() => handleNavigateToStop(stop)}>
+                    <View style={[
+                      styles.stopListNum,
+                      {backgroundColor: STOP_COLORS[stop.type] || colors.primary},
+                      isPassed && {opacity: 0.4},
+                    ]}>
+                      <Text style={styles.stopListNumText}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.stopListInfo}>
+                      <Text style={[styles.stopListName, isPassed && styles.stopListNamePassed]} numberOfLines={1}>
+                        {STOP_ICONS[stop.type] || '📍'} {stop.name}
+                      </Text>
+                      <Text style={styles.stopListTime}>{stop.time || ''}</Text>
+                    </View>
+                    {isPassed && <Text style={styles.stopListCheck}>✓</Text>}
+                    {isNext && <Text style={styles.stopListNextBadge}>NEXT</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {flex: 1, backgroundColor: colors.background},
+  map: {width, height},
+  topBar: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center',
+    paddingTop: 44, paddingHorizontal: 12, paddingBottom: 12,
+    backgroundColor: 'rgba(15,15,26,0.85)',
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',
+    marginRight: 12,
+  },
+  backArrow: {fontSize: 20, color: colors.text},
+  topBarTitle: {flex: 1},
+  tripTitle: {fontSize: 16, fontWeight: '700', color: colors.text},
+  liveIndicator: {flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2},
+  liveDot: {width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger},
+  liveText: {fontSize: 11, color: colors.danger, fontWeight: '700', letterSpacing: 1},
+  listBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',
+    marginLeft: 12,
+  },
+  listBtnIcon: {fontSize: 18},
+  // Stop markers
+  markerWrapper: {alignItems: 'center'},
+  markerContainer: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#FFFFFF',
+  },
+  markerPassed: {opacity: 0.4},
+  markerNext: {
+    borderColor: colors.text, borderWidth: 3,
+    shadowColor: colors.primary, shadowOpacity: 0.8, shadowRadius: 8, elevation: 8,
+  },
+  markerIcon: {fontSize: 16},
+  markerNumberBadge: {
+    position: 'absolute', top: -6, right: -6,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#FFF',
+  },
+  markerNumberText: {fontSize: 10, fontWeight: '700', color: colors.background},
+  markerLabel: {
+    backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2, marginTop: 2, maxWidth: 110,
+  },
+  markerLabelText: {fontSize: 9, color: '#FFF', fontWeight: '600'},
+  // Rider marker
+  riderMarker: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center'},
+  riderRing: {
+    position: 'absolute', width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#2563EB33', borderWidth: 2, borderColor: '#2563EB88',
+  },
+  riderAvatar: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#FFFFFF',
+  },
+  riderAvatarIcon: {fontSize: 16},
+  // Status card
+  statusCard: {
+    position: 'absolute', bottom: 100, left: 12, right: 12,
+    backgroundColor: 'rgba(22,33,62,0.95)', borderRadius: 16,
+    padding: 14, borderWidth: 0.5, borderColor: colors.border,
+  },
+  statusRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6},
+  statusBadge: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10},
+  statusBadgeText: {fontSize: 13, fontWeight: '700'},
+  nextStopBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.primary + '22', borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 0.5, borderColor: colors.primary,
+  },
+  nextStopLabel: {fontSize: 10, color: colors.primary, fontWeight: '700'},
+  nextStopText: {flex: 1, fontSize: 11, color: colors.text, fontWeight: '600'},
+  nextStopArrow: {fontSize: 14},
+  distanceText: {fontSize: 11, color: colors.textMuted, marginTop: 2},
+  speedText: {fontSize: 11, color: colors.textMuted, marginTop: 4},
+  // Bottom controls
+  bottomControls: {
+    position: 'absolute', bottom: 24, left: 16, right: 16,
+    flexDirection: 'row', gap: 12, alignItems: 'center',
+  },
+  recenterBtn: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 0.5, borderColor: colors.border,
+  },
+  recenterIcon: {fontSize: 22},
+  endTripBtn: {
+    flex: 1, backgroundColor: colors.danger,
+    borderRadius: 26, padding: 16, alignItems: 'center',
+  },
+  endTripText: {fontSize: 16, fontWeight: '700', color: colors.text},
+  // Stop list modal
+  modalOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center',
+    alignItems: 'center', zIndex: 999,
+  },
+  modalBox: {
+    backgroundColor: colors.card, borderRadius: 20,
+    width: '90%', maxHeight: '75%',
+    borderWidth: 0.5, borderColor: colors.border, overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, borderBottomWidth: 0.5, borderBottomColor: colors.border,
+  },
+  modalTitle: {fontSize: 16, fontWeight: '700', color: colors.text},
+  modalClose: {fontSize: 18, color: colors.textMuted, padding: 4},
+  stopListItem: {
+    flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10,
+    borderBottomWidth: 0.5, borderBottomColor: colors.border,
+  },
+  stopListItemActive: {backgroundColor: colors.primary + '15'},
+  stopListNum: {
+    width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stopListNumText: {fontSize: 12, fontWeight: '700', color: '#FFF'},
+  stopListInfo: {flex: 1},
+  stopListName: {fontSize: 13, color: colors.text, fontWeight: '600'},
+  stopListNamePassed: {color: colors.textMuted, textDecorationLine: 'line-through'},
+  stopListTime: {fontSize: 11, color: colors.textMuted, marginTop: 2},
+  stopListCheck: {fontSize: 16, color: colors.success},
+  stopListNextBadge: {
+    fontSize: 9, fontWeight: '700', color: colors.primary,
+    backgroundColor: colors.primary + '22', paddingHorizontal: 6,
+    paddingVertical: 3, borderRadius: 6,
+  },
+  routeLoadingBadge: {
+  position: 'absolute', top: 90, left: 12, right: 12,
+  backgroundColor: colors.card, borderRadius: 10, padding: 8,
+  alignItems: 'center', borderWidth: 0.5, borderColor: colors.border,
+},
+routeLoadingText: {fontSize: 11, color: colors.textSecondary},
+});
+
+export default ActiveRideScreen;

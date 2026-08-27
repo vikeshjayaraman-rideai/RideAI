@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "938115374904",
+    "project_id": "rideai-84dff",
+    "storage_bucket": "rideai-84dff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:938115374904:android:23eb43ccc7fd559089abcd",
+        "android_client_info": {
+          "package_name": "com.rideai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "938115374904-nisepd4k06s314m399t94849p8tpbsi0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rideai",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "938115374904-qr4f5kitiqfrg9h6est6ijg8n0cc0o23.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDuK5d4KPlNrGohSXlBIK1By6apliRMpY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "938115374904-qr4f5kitiqfrg9h6est6ijg8n0cc0o23.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

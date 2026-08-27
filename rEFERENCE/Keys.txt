@@ -1,0 +1,25 @@
+Google api key - AIzaSyAmINnlsVMmBideXP9MeFwVaBxYSH5ijEI
+
+claude console api key - 1234567890
+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
+
+
+AI gemini - Googlestudio
+
+Key: AQ.Ab8RN6Ki9Tx994KaGjpRxvz1l5hsWEQ5O2y0tPiZO5eFDoIkXw
+
+Name: RideAI
+Project name: projects/737111683435
+Project Number: 737111683435
+
+AGORA CONSOLE: https://console.agora.io/project-management
+Key: 85cc72a8679a42998722b791f486dbdf
+Channelname: rideaitest
+Token: 
+const channelName = 'rideaitest';
+const TOKEN = '007eJxTYHh2Je6v+eqbWWGPZus8kSyTvb+ww1by4z6BfTsz1H9XlUgqMFiYJiebGyVamJlbJpoYWVpamBsZJZlbGqaZWJilJKWkHWt2zmoIZGTQefKJmZEBAkF8LoaizJTUxMyS1OISBgYAnBYjjA==';
+      console.log('Joining channel:', channelName, 'uid:', agoraUid, 'token length:', TOKEN.length);
+
+
+OpenAI Console https://platform.openai.com/settings/organization/api-keys
+key: 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

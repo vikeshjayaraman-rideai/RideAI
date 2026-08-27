@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">RideAI</string>
+      <string name="facebook_app_id">994118813201913</string>
+    <string name="facebook_client_token">2c84d86e926779bef666b4e546a355d9</string>
+</resources>

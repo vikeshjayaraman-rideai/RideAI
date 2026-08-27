@@ -1,0 +1,20 @@
+In your babel.config.js, make sure ALL env keys are listed:
+
+module.exports = {
+  presets: ['module:metro-react-native-babel-preset'],
+  plugins: [
+    ['module:react-native-dotenv', {
+      moduleName: '@env',
+      path: '.env',
+      allowUndefined: true,
+    }],
+  ],
+};
+
+And your .env file should have:
+GEMINI_API_KEY=AIza...
+GOOGLE_MAPS_API_KEY=AIzaSyAmINnlsVMmBideXP9MeFwVaBxYSH5ijEI
+IMGUR_CLIENT_ID=546c25a59c58ad7
+AGORA_APP_ID=85cc72a8c19e4894bb2e934de3b5ed35
+AGORA_TEMP_TOKEN=007eJx...your_token...
+AGORA_CHANNEL=rideaitest

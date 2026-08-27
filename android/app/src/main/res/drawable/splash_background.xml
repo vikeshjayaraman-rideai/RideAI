@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="#0F0F1A"/>
+    </item>
+    <item
+        android:width="200dp"
+        android:height="100dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/tripper_logo"
+            android:gravity="center"
+            android:tint="#FF6B35"/>
+    </item>
+</layer-list>
