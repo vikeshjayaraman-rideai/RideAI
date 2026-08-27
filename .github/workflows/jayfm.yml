@@ -57,7 +57,11 @@ jobs:
         run: |
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           echo "FIREBASE_PROJECT_ID=rideai-84dff" >> .env
-
+      - name: Debug
+        run: |
+          ls scripts/
+          node -e "require('./scripts/jayFMConfig'); console.log('Config OK')"
+          
       - name: Morning Content (5AM IST)
         if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning-content' || github.event.inputs.task == 'all-content'
         run: node scripts/generateJayFMContent.js --today --morning
