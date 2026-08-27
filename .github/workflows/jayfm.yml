@@ -38,12 +38,11 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Setup credentials
-        env:
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "$GOOGLE_SERVICE_ACCOUNT" > google-services-admin.json
-          echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+          echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_B64 }}" | base64 --decode > google-services-admin.json
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
+          echo "Credentials setup done"
+          python3 -c "import json; json.load(open('google-services-admin.json')); print('JSON valid!')" 
 
       - name: Debug - check files
         run: |
