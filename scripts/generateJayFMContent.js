@@ -19,49 +19,21 @@ const rssParser = new Parser({
 
 // ── RSS News Fetcher ──────────────────────────────────────────────────────────
 const NEWS_FEEDS = {
-  // Priority: Tamil Nadu news first
-  tamilnadu: [
-    'https://www.thehindu.com/news/states/tamil-nadu/feeder/default.rss',
-    'https://timesofindia.indiatimes.com/rss/feed/1221148',
-  ],
   india_general: [
     'https://www.thehindu.com/news/national/feeder/default.rss',
+    'https://www.thehindu.com/news/national/feeder/default.rss',
     'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
-    'https://feeds.bbci.co.uk/news/india/rss.xml',
   ],
   india_politics: [
     'https://www.thehindu.com/news/national/feeder/default.rss',
-    'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
+    'https://www.thehindu.com/news/national/feeder/default.rss',
   ],
   world: [
     'https://feeds.bbci.co.uk/news/world/rss.xml',
     'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
   ],
-  entertainment: [
-    'https://www.thehindu.com/entertainment/feeder/default.rss',
-    'https://timesofindia.indiatimes.com/rss/feed/1081479',
-  ],
-  movies: [
-    'https://www.thehindu.com/entertainment/movies/feeder/default.rss',
-    'https://timesofindia.indiatimes.com/rss/feed/66949542',
-  ],
-  sports: [
-    'https://www.thehindu.com/sport/feeder/default.rss',
-    'https://feeds.bbci.co.uk/sport/rss.xml',
-    'https://www.espncricinfo.com/rss/content/story/feeds/0.xml',
-  ],
-  climate: [
-    'https://www.thehindu.com/sci-tech/energy-and-environment/feeder/default.rss',
-    'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
-    'https://timesofindia.indiatimes.com/rss/feed/2647163',
-  ],
-  science: [
-    'https://www.thehindu.com/sci-tech/feeder/default.rss',
-    'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
-    'https://rss.nytimes.com/services/xml/rss/nyt/Science.xml',
-  ],
   technology: [
-    'https://www.thehindu.com/sci-tech/feeder/default.rss',
+    'https://www.thehindu.com/news/national/feeder/default.rss',
     'https://www.thehindu.com/sci-tech/feeder/default.rss',
   ],
   sports: [
@@ -90,51 +62,11 @@ async function fetchRealRasiPalan() {
   } catch { return {}; }
 }
 
-async function fetchLatestMovies(count = 5) {
-  try {
-    const feeds = NEWS_FEEDS.movies || [];
-    const allMovies = [];
-    for (const feedUrl of feeds) {
-      try {
-        const feed = await rssParser.parseURL(feedUrl);
-        const recent = (feed.items || [])
-          .filter(item => {
-            const pub = new Date(item.pubDate);
-            const days = (Date.now() - pub.getTime()) / (1000 * 60 * 60 * 24);
-            // Only reviews from last 14 days
-            return days <= 14 && item.title && 
-              (item.title.toLowerCase().includes('review') || 
-               item.title.toLowerCase().includes('trailer'));
-          })
-          .map(item => ({
-            title: item.title,
-            // Include full content snippet for Gemini to use
-            summary: (item.contentSnippet || item.content || '').substring(0, 500),
-            date: item.pubDate?.substring(0, 10),
-          }));
-        allMovies.push(...recent);
-        if (allMovies.length >= count) break;
-      } catch (e) {}
-    }
-    // Deduplicate by title
-    const seen = new Set();
-    return allMovies.filter(m => {
-      const key = m.title.toLowerCase().replace(/[^a-z]/g, '').substring(0, 20);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, count);
-  } catch { return []; }
-}
-
 async function fetchNewsFromRSS(feedType = 'india_general', count = 6) {
   const feeds = NEWS_FEEDS[feedType] || NEWS_FEEDS.india_general;
   const allItems = [];
   
-  // Shuffle feeds to rotate sources each segment
-  const shuffled = [...feeds].sort(() => Math.random() - 0.5);
-  
-  for (const feedUrl of shuffled) {
+  for (const feedUrl of feeds) {
     try {
       console.log(`  📡 Fetching RSS: ${feedUrl.split('/')[2]}`);
       const feed = await rssParser.parseURL(feedUrl);
@@ -163,19 +95,14 @@ async function fetchNewsFromRSS(feedType = 'india_general', count = 6) {
 // Map slot/segment to RSS feed type
 function getRSSFeedType(slotId, segIdx, isLocal = false) {
   if (isLocal) return 'tamil_local';
-  // Rotate categories across 8 segments - TN news gets priority (2 slots)
-  // segIdx is 0-based: seg1=0, seg2=1, seg3=2...seg8=7
-  const feedRotation = [
-    'tamilnadu',      // segIdx 0 = Seg1: TN news first!
-    'world',          // segIdx 1 = Seg2: World news
-    'india_general',  // segIdx 2 = Seg3: India national
-    'sports',         // segIdx 3 = Seg4: Sports
-    'climate',        // segIdx 4 = Seg5: Climate & Weather
-    'entertainment',  // segIdx 5 = Seg6: Entertainment/Cinema
-    'science',        // segIdx 6 = Seg7: Science & Tech
-    'india_politics', // segIdx 7 = Seg8: India Politics
-  ];
-  return feedRotation[segIdx % feedRotation.length];
+  const newsCategories = CONFIG.NEWS_CATEGORIES;
+  const category = newsCategories[Math.min(segIdx, newsCategories.length - 1)];
+  if (segIdx >= newsCategories.length - 1) return 'sports';
+  if (category.includes('அரசியல்')) return 'india_politics';
+  if (category.includes('உலக')) return 'world';
+  if (category.includes('அறிவியல்')) return 'technology';
+  if (category.includes('சினிமா')) return 'cinema';
+  return 'india_general';
 }
 
 // ── Song search via Firebase Cloud Function (JioSaavn proxy in Mumbai) ──────
@@ -225,6 +152,24 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ── Schedule ──────────────────────────────────────────────────────────────────
 // Language-aware song queries per slot
+const SONG_QUERIES = {
+  rhythms:      { 'ta-IN': 'Tamil morning motivation rhythm songs', 'hi-IN': 'Hindi morning motivation songs', 'te-IN': 'Telugu morning songs', 'ml-IN': 'Malayalam morning songs', 'en-IN': 'English morning motivation songs' },
+  rasi_palan:   { 'ta-IN': 'Tamil melody songs Ilaiyaraaja', 'hi-IN': 'Hindi melody songs', 'te-IN': 'Telugu melody songs', 'ml-IN': 'Malayalam melody songs', 'en-IN': 'Indian melody songs' },
+  morning_news: { 'ta-IN': 'Tamil superhit songs 2024', 'hi-IN': 'Bollywood hits 2024', 'te-IN': 'Telugu hits 2024', 'ml-IN': 'Malayalam hits 2024', 'en-IN': 'Hindi Tamil popular songs' },
+  thalaivar:    { 'ta-IN': 'Tamil patriotic inspirational songs', 'hi-IN': 'Hindi desh bhakti songs', 'te-IN': 'Telugu patriotic songs', 'ml-IN': 'Malayalam patriotic songs', 'en-IN': 'Indian patriotic songs' },
+  health:       { 'ta-IN': 'Tamil peppy energetic songs', 'hi-IN': 'Hindi energetic songs', 'te-IN': 'Telugu peppy songs', 'ml-IN': 'Malayalam peppy songs', 'en-IN': 'Tamil upbeat songs' },
+  movie_review: { 'ta-IN': 'Tamil movie songs 2024 latest', 'hi-IN': 'Bollywood movie songs 2024', 'te-IN': 'Telugu movie songs 2024', 'ml-IN': 'Malayalam movie songs 2024', 'en-IN': 'Tamil Hindi movie songs' },
+  agriculture:  { 'ta-IN': 'Tamil folk village songs', 'hi-IN': 'Hindi folk songs', 'te-IN': 'Telugu folk songs', 'ml-IN': 'Malayalam folk songs', 'en-IN': 'Indian folk songs' },
+  travel:       { 'ta-IN': 'Tamil road trip travel songs', 'hi-IN': 'Hindi road trip songs', 'te-IN': 'Telugu travel songs', 'ml-IN': 'Malayalam travel songs', 'en-IN': 'Tamil travel songs' },
+  local_news:   { 'ta-IN': 'Tamil melody songs hits', 'hi-IN': 'Hindi melody hits', 'te-IN': 'Telugu melody hits', 'ml-IN': 'Malayalam melody hits', 'en-IN': 'Indian melody songs' },
+  weather:      { 'ta-IN': 'Tamil mazhai rain songs', 'hi-IN': 'Hindi barish rain songs', 'te-IN': 'Telugu rain songs', 'ml-IN': 'Malayalam rain songs', 'en-IN': 'Tamil rain songs' },
+  comedy:       { 'ta-IN': 'Tamil comedy fun songs kuthu', 'hi-IN': 'Hindi comedy songs', 'te-IN': 'Telugu comedy songs', 'ml-IN': 'Malayalam comedy songs', 'en-IN': 'Tamil fun songs' },
+  science:      { 'ta-IN': 'Tamil instrumental BGM songs', 'hi-IN': 'Hindi instrumental songs', 'te-IN': 'Telugu instrumental', 'ml-IN': 'Malayalam instrumental', 'en-IN': 'Indian instrumental songs' },
+  evening_news: { 'ta-IN': 'Tamil evening melody songs', 'hi-IN': 'Hindi evening songs', 'te-IN': 'Telugu evening songs', 'ml-IN': 'Malayalam evening songs', 'en-IN': 'Indian evening songs' },
+  horror:       { 'ta-IN': 'Tamil thriller horror BGM songs', 'hi-IN': 'Hindi thriller BGM', 'te-IN': 'Telugu horror BGM', 'ml-IN': 'Malayalam thriller BGM', 'en-IN': 'Tamil horror BGM songs' },
+  love:         { 'ta-IN': 'Tamil love romantic songs', 'hi-IN': 'Hindi romantic songs', 'te-IN': 'Telugu romantic songs', 'ml-IN': 'Malayalam romantic songs', 'en-IN': 'Tamil romantic songs' },
+  night:        { 'ta-IN': 'Tamil chill night melody songs', 'hi-IN': 'Hindi night chill songs', 'te-IN': 'Telugu night songs', 'ml-IN': 'Malayalam night songs', 'en-IN': 'Indian chill night songs' },
+};
 
 // Use CONFIG.SCHEDULE so segments stay in sync with jayFMConfig.js
 const SCHEDULE = CONFIG.SCHEDULE;
@@ -287,35 +232,6 @@ async function callGemini(prompt, minLength = 100) {
 
 // ── Dynamic topic picker ──────────────────────────────────────────────────────
 async function pickTopicOfDay(contentType, dateStr) {
-  // For movie_review - use latest RSS movie directly as topic
-  if (contentType === 'movie') {
-    try {
-      const latestMovies = await fetchLatestMovies(5);
-      if (latestMovies.length > 0) {
-        const usedDoc = await db.collection('jaysfm_topics').doc('movie').get();
-        const usedMovies = usedDoc.exists ? (usedDoc.data().used || []).map(u => u.topic?.toLowerCase().replace(/[^a-z]/g,'').substring(0,15)) : [];
-        const freshMovie = latestMovies.find(m => {
-          const key = (m.title || '').toLowerCase().replace(/[^a-z]/g,'').substring(0,15);
-          return !usedMovies.includes(key);
-        });
-        if (freshMovie) {
-          // Extract just movie title from review headline
-          const cleanTopic = (freshMovie.title || '')
-            .replace(/movie review:/i, '').replace(/review:/i, '')
-            .split(':')[0].trim().substring(0, 80);
-          console.log(`  🎬 Using RSS movie: "${cleanTopic}"`);
-          try {
-            const ref = db.collection('jaysfm_topics').doc('movie');
-            const doc = await ref.get();
-            const used = doc.exists ? (doc.data().used || []) : [];
-            used.push({ topic: cleanTopic, date: new Date().toISOString() });
-            await ref.set({ used: used.slice(-30) });
-          } catch {}
-          return cleanTopic;
-        }
-      }
-    } catch (e) { console.log('  ⚠️ Movie RSS failed:', e.message?.substring(0,40)); }
-  }
   // Check if already picked today
   // Skip cache - always pick fresh topic
   // try {
@@ -337,9 +253,9 @@ async function pickTopicOfDay(contentType, dateStr) {
     motivational: `பைக் ஓட்டுபவர்களுக்கான காலை ரேடியோ நிகழ்ச்சிக்கு ஒரு தூண்டுதல் தலைப்பு தமிழில் சொல்லவும். சுருக்கமாக, குறிப்பிட்டதாக இருக்கட்டும். உதாரணம்: "தோல்வியிலிருந்து எழுவதே வீரம்". ${usedList} தலைப்பு மட்டும் சொல்லவும்.`,
     astrology:    `சரியாக இதை சொல்லவும்: "அனைத்து 12 ராசிகளுக்கும் இன்றைய ராசி பலன்"`,
     news:         `இன்றைய இந்திய ரேடியோவுக்கு ஒரு குறிப்பிட்ட செய்தி தலைப்பு தமிழில் சொல்லவும். ${usedList} தலைப்பு மட்டும் சொல்லவும்.`,
-    leader:       `ONE specific Indian leader name only. Examples: "Bhagat Singh", "Subhas Chandra Bose", "APJ Abdul Kalam", "Periyar", "Ambedkar", "Rajaji", "Kamaraj", "MGR", "Sivaji Ganesan", "Bharathiyar". ${usedList} Reply with ONLY the person's name, nothing else. No titles like "Indian Leaders".`,
+    leader:       `ஒரு ஊக்கமளிக்கும் இந்திய தலைவர், சுதந்திர போராட்டவீரர், அல்லது விஞ்ஞானி பெயரை தமிழில் சொல்லவும். உதாரணம்: "டாக்டர் ஏபிஜே அப்துல் கலாம் - இந்தியாவின் மிசைல் மனிதர்". ${usedList} பெயரும் விளக்கமும் மட்டும் சொல்லவும்.`,
     health:       `பைக் ஓட்டுபவர்களுக்கான ஒரு குறிப்பிட்ட ஆரோக்கிய தலைப்பை தமிழில் சொல்லவும். உதாரணம்: "நீண்ட பயணத்தில் முதுகு வலி தவிர்க்கும் வழிகள்". ${usedList} தலைப்பு மட்டும் சொல்லவும்.`,
-    movie:        `Suggest ONE movie released THIS WEEK or LAST WEEK for radio review. Priority: 1) New Tamil releases 2) New Hindi releases 3) New English/Hollywood releases. If no recent releases, pick best Tamil movie from 2024-2026. ${usedList} Reply with: Movie Title (Year) - Hero/Director only. No other text.`,
+    movie:        `ஒரு சமீபத்திய தமிழ் திரைப்படத்தை (2020-2026) ரேடியோ மதிப்பீட்டுக்கு பரிந்துரைக்கவும். உதாரணம்: "லியோ (2023) - விஜய்". ${usedList} திரைப்பட தலைப்பு, வருடம், நடிகர் மட்டும் சொல்லவும்.`,
     agriculture:  `தமிழ்நாடு விவசாயிகளுக்கான ஒரு குறிப்பிட்ட விவசாய தலைப்பை தமிழில் சொல்லவும். உதாரணம்: "சிறு விவசாயிகளுக்கு சொட்டு நீர் பாசனம்". ${usedList} தலைப்பு மட்டும் சொல்லவும்.`,
     travel:       `பைக் ஓட்டுபவர்களுக்கான ஒரு குறிப்பிட்ட இந்திய பயண இடத்தை தமிழில் சொல்லவும். உதாரணம்: "ஊட்டி - மலை ராணி". ${usedList} இட பெயரும் சுருக்கமான விளக்கமும் மட்டும் சொல்லவும்.`,
     local_news:   `தமிழ்நாடு பைக் ஓட்டுபவர்களுக்கான இன்றைய உள்ளூர் செய்தி தலைப்பை தமிழில் சொல்லவும். ${usedList} தலைப்பு மட்டும் சொல்லவும்.`,
@@ -352,10 +268,8 @@ async function pickTopicOfDay(contentType, dateStr) {
   };
 
   const prompt = topicPrompts[contentType] || topicPrompts.science;
-  console.log(`  📋 ${contentType} usedList: ${usedList || 'none'}`);
   const topic = await callGemini(prompt, 5);
   const cleanTopic = (topic || '').trim().split('\n')[0].trim() || `${contentType} content`;
-  console.log(`  🎯 ${contentType} topic picked: "${cleanTopic}"`);
 
   // Save used topic
   try {
@@ -375,7 +289,7 @@ async function pickTopicOfDay(contentType, dateStr) {
 }
 
 // ── Generate radio script segment ─────────────────────────────────────────────
-async function generateSegment(slot, segIdx, topic, prevScript, dateStr, usedHeadlines = new Set(), extraContext = '') {
+async function generateSegment(slot, segIdx, topic, prevScript, dateStr) {
   const partNames = ['Opening Segment', 'Middle Segment', 'Closing Segment', 'Bonus Segment'];
   const partName = partNames[segIdx % partNames.length];
   const isFirst = segIdx === 0;
@@ -462,73 +376,14 @@ Total minimum 900 characters`,
 
   // Fetch real news from RSS for news slots
   let realNewsItems = [];
-  let feedType = 'india_general'; // declared outside so accessible in alternate feed block
   if (isNews) {
     try {
-      feedType = getRSSFeedType(slot.id, segIdx, isLocalNews);
+      const feedType = getRSSFeedType(slot.id, segIdx, isLocalNews);
       realNewsItems = await fetchNewsFromRSS(feedType, 5);
     } catch (e) {
       console.log('  ⚠️ RSS fetch failed, using Gemini knowledge');
     }
   }
-  
-  // Filter out headlines already used in previous segments
-  console.log(`  🔍 usedHeadlines size: ${usedHeadlines.size}, realNewsItems: ${realNewsItems.length}`);
-  if (realNewsItems.length > 0 && usedHeadlines.size > 0) {
-    const before = realNewsItems.length;
-    realNewsItems = realNewsItems.filter(item => {
-      const key = item.title?.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-      return !usedHeadlines.has(key);
-    });
-    if (realNewsItems.length < before) {
-      console.log(`  🔄 Filtered ${before - realNewsItems.length} duplicate headlines`);
-    }
-    // If all filtered out - try alternate RSS feeds
-    if (realNewsItems.length === 0 && isNewsType) {
-      console.log(`  ♻️ All headlines duplicate - trying alternate RSS feeds...`);
-      const currentFeed = feedType || 'india_general';
-      // Try feeds in order of least overlap with what's been fetched
-      const priorityAlternates = {
-        'science': ['sports', 'entertainment', 'tamilnadu'],
-        'india_politics': ['sports', 'entertainment', 'world'],
-        'tamilnadu': ['world', 'science', 'sports'],
-        'world': ['tamilnadu', 'sports', 'science'],
-        'sports': ['entertainment', 'science', 'climate'],
-        'entertainment': ['sports', 'science', 'climate'],
-        'climate': ['sports', 'entertainment', 'tamilnadu'],
-        'india_general': ['world', 'sports', 'entertainment'],
-      };
-      const alternates = priorityAlternates[currentFeed] || ['sports', 'entertainment', 'world'];
-      const alternateFeed = alternates[0];
-      try {
-        const altItems = await fetchNewsFromRSS(alternateFeed, 5);
-        realNewsItems = (altItems || []).filter(item => {
-          const key = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-          return key && !usedHeadlines.has(key);
-        });
-        console.log(`  ✅ Got ${realNewsItems.length} fresh headlines from ${alternateFeed}`);
-        // Add alternate headlines to used set too
-        realNewsItems.forEach(item => {
-          const key = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-          if (key) {
-            usedHeadlines.add(key);
-            console.log(`  📰 Headline (alt): ${item.title?.substring(0, 60)}`);
-          }
-        });
-      } catch(e) { 
-        console.log(`  ⚠️ Alternate feed failed: ${e.message?.substring(0, 50)}`);
-        realNewsItems = []; // Use Gemini knowledge as fallback
-      }
-    }
-  }
-  // Add current headlines to used set
-  realNewsItems.forEach(item => {
-    const key = item.title?.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-    if (key) {
-      usedHeadlines.add(key);
-      console.log(`  📰 Headline: ${item.title?.substring(0, 60)}`);
-    }
-  });
   
   const realNewsContext = realNewsItems.length > 0
     ? '\n\n=== REAL NEWS FROM RSS FEEDS (MUST USE THESE) ===\n' + 
@@ -594,25 +449,6 @@ ${localCats[segIdx % localCats.length]} பற்றி 3 செய்திக�
 
 800 முதல் 1200 எழுத்துகள் மட்டும். 1200 க்கு மேல் வேண்டாம். ஒவ்வொரு செய்தியும் முழுமையாக இருக்கவேண்டும்.`;
     }
-  } else if (slot.contentType === 'spiritual' || slot.id === 'rhythms') {
-    // Rhythms: Thirukural, Mahabharata, Bible, Quran in pairs
-    const spiritualMap = [
-      { source: 'திருக்குறள் (Thirukkural)', instruction: 'ஒரு திருக்குறளை சொல்லவும் - குறள், பொருள், நவீன வாழ்க்கையில் உதாரணம், சிறு கதை. 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'திருக்குறள் (Thirukkural)', instruction: 'மற்றொரு திருக்குறளை சொல்லவும் - குறள், பொருள், நடைமுறை பயன், அனைவருக்கும் உதாரணம். 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'மகாபாரதம் / பகவத் கீதை', instruction: 'ஒரு கீதை ஸ்லோகம் அல்லது மகாபாரத சம்பவம் - அர்த்தம், வாழ்க்கை பாடம், உதாரணம். 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'மகாபாரதம் / பகவத் கீதை', instruction: 'மற்றொரு கீதை ஸ்லோகம் அல்லது மகாபாரத கதாபாத்திரம் பற்றிய ஊக்கமளிக்கும் கதை. 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'பைபிள் (Bible)', instruction: 'ஒரு பைபிள் வாக்கியம் - Bible verse (English + Tamil), அர்த்தம், வாழ்க்கை பயன், அனைவருக்கும் பொருந்தும் செய்தி. 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'பைபிள் (Bible)', instruction: 'மற்றொரு பைபிள் வாக்கியம் - verse + அர்த்தம் + உண்மை கதை / உதாரணம். 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'குர்ஆன் (Quran)', instruction: 'ஒரு குர்ஆன் வசனம் - Arabic verse + Tamil பொருள், வாழ்க்கை பாடம், அனைத்து மதத்தினருக்கும் ஏற்ற செய்தி. 800 முதல் 1000 எழுத்துகள்.' },
-      { source: 'குர்ஆன் (Quran)', instruction: 'மற்றொரு குர்ஆன் வசனம் + அர்த்தம் + ஊக்கமளிக்கும் கதை / உதாரணம். 800 முதல் 1000 எழுத்துகள்.' },
-    ];
-    const spiritual = spiritualMap[segIdx % spiritualMap.length];
-    contentDirection = `[RHYTHMS - SPIRITUAL WISDOM - ${spiritual.source}]
-தமிழிலேயே மட்டும் எழுதவும். Jay FM காலை ஆன்மீக நிகழ்ச்சி.
-ஆதாரம்: ${spiritual.source}
-${spiritual.instruction}
-
-முக்கியம்: அனைத்து மதத்தினரும், அனைத்து வயதினரும் கேட்கும் நிகழ்ச்சி. எல்லோரையும் கலந்து கொள்ளச் செய்யும் வகையில் எழுதவும்.`;
   } else {
     contentDirection = contentGuide[slot.contentType] || 'Be engaging and entertaining.';
   }
@@ -669,7 +505,7 @@ Include:
 2. A general star wisdom/tip applicable to all rashis today
 3. Motivational message about hard work + planetary guidance
 4. Warm farewell: invite listeners tomorrow same time
-5. Brief transition saying a song is coming (do NOT mention specific song title)
+5. Final song announcement
 
 Write in pure Tamil. Minimum 500 characters. Warm closing style.`;
     }
@@ -692,8 +528,7 @@ Write in pure Tamil. Minimum 500 characters. Warm closing style.`;
     (!isNews && !isAstrology ? 'TOPIC: ' + topic + '\n' : '') +
     'SEGMENT: ' + (segIdx+1) + ' of ' + slot.segments + '\n' +
     (continuation ? 'CONTINUES FROM: ' + continuation.substring(0, 100) + '...\n' : '') +
-    (isNews ? `\nNEWS CATEGORY: ${feedType.replace('_',' ').toUpperCase()} NEWS\n` : '') +
-    realNewsContext + extraContext + '\n' +
+    realNewsContext + '\n' +
     '\nCONTENT INSTRUCTIONS:\n' + contentDirection + '\n' +
     '\nMINIMUM: 1000 characters. Be detailed.\n' +
     (isFirst && !isNews ? 'OPENING segment - welcome listeners warmly.\n' : '') +
@@ -718,11 +553,9 @@ async function fetchSongs(query, count = 10, slotId = '') {
   // Try each variation until we have enough songs
   const queriesToTry = shuffled.length > 0 ? shuffled : [query];
   
-  const usedQueries = new Set();
   for (const q of queriesToTry) {
     if (allSongs.length >= count) break;
-    if (usedQueries.has(q)) { console.log(`  ⏭️ Skipping repeated query: ${q}`); continue; }
-    usedQueries.add(q);
+    
     const randomOffset = Math.floor(Math.random() * 8) + 1;
     console.log(`  🎵 Searching: "${q}" (page ${randomOffset})`);
     
@@ -735,20 +568,13 @@ async function fetchSongs(query, count = 10, slotId = '') {
     
     // Deduplicate and add
     for (const s of songs) {
-      // Dedup by base title only (strip anything in brackets/parentheses and HTML)
-      const baseTitle = (s.title || '')
-        .replace(/&[^;]+;/g, '') // remove HTML entities
-        .replace(/\s*\(.*?\)/g, '') // remove (From "DC"), (Trending Version) etc
-        .replace(/\s*\[.*?\]/g, '') // remove [...]
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, ''); // keep only alphanumeric
-      const key = baseTitle;
+      // Dedup by normalized title (remove special chars, spaces, HTML entities)
+      const key = (s.title || '').toLowerCase()
+        .replace(/&[^;]+;/g, '') // remove HTML entities like &quot;
+        .replace(/[^a-z0-9]/g, ''); // remove non-alphanumeric
       if (!seenTitles.has(key) && s.url && key.length > 3) {
         seenTitles.add(key);
         allSongs.push(s);
-        console.log(`  ✅ Added: ${s.title} [key: ${key}]`);
-      } else if (seenTitles.has(key)) {
-        console.log(`  🚫 Duplicate skipped: ${s.title} [key: ${key}]`);
       }
     }
     console.log(`  ✅ Total songs so far: ${allSongs.length}`);
@@ -788,39 +614,6 @@ async function main() {
   console.log(`📻 Generating ${slots.length} slot(s)\n`);
 
   for (const slot of slots) {
-    // music_only slots - just songs, no content
-    if (slot.contentType === 'music_only') {
-      console.log(`\n${slot.emoji} ${slot.title} — Songs only`);
-      const nightQueries = CONFIG.SONG_QUERIES?.night_music || CONFIG.SONG_QUERIES?.night || ['Tamil night songs'];
-      const queryList = Array.isArray(nightQueries) ? nightQueries : [nightQueries];
-      const allSongs = [];
-      const seenTitles = new Set();
-      for (const query of queryList) {
-        if (allSongs.length >= 50) break;
-        try {
-          const url = 'https://asia-southeast1-rideai-84dff.cloudfunctions.net/searchSongs?query=' + encodeURIComponent(query) + '&count=10';
-          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-          const data = await res.json();
-          for (const song of (data.songs || [])) {
-            const key = (song.title || '').toLowerCase().replace(/[^a-z]/g,'').substring(0,15);
-            if (!seenTitles.has(key) && song.url && key.length > 3) {
-              seenTitles.add(key);
-              allSongs.push(song);
-            }
-          }
-          console.log(`  🎵 "${query}": total=${allSongs.length}`);
-        } catch(e) { console.log(`  ⚠️ ${query}: ${e.message?.substring(0,40)}`); }
-        await new Promise(r => setTimeout(r, 500));
-      }
-      const playlist = allSongs.map(s => ({ type: 'song', ...s }));
-      await db.collection('jaysfm').doc(dateStr).collection('slots').doc(slot.id).set({
-        slotId: slot.id, title: slot.title, segments: [], songs: allSongs, playlist,
-        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      console.log(`  ✅ Night music: ${allSongs.length} songs saved`);
-      continue;
-    }
-
     const isNewsSlot = ['morning_news', 'local_news', 'evening_news', 'weather'].includes(slot.id);
     const isAstrologySlot = slot.id === 'rasi_palan';
     process.stdout.write(`\n${slot.emoji} ${slot.title} — `);
@@ -850,10 +643,9 @@ async function main() {
     const slotData = { id: slot.id, title: slot.title, emoji: slot.emoji, contentType: slot.contentType, topic, segments: [], songs: [], generatedAt: new Date().toISOString() };
 
     let prevScript = '';
-    const usedHeadlines = new Set(); // Fresh set per slot - no repeated headlines
     for (let i = 0; i < slot.segments; i++) {
       process.stdout.write(`  Segment ${i+1}/${slot.segments}... `);
-      const script = await generateSegment(slot, i, topic, prevScript, dateStr, usedHeadlines);
+      const script = await generateSegment(slot, i, topic, prevScript, dateStr);
       if (script) {
         prevScript = script; // keep full script for continuation context
       }
@@ -880,35 +672,10 @@ async function main() {
     }
 
     // Pick random query from SONG_QUERIES array (shuffled in fetchSongs)
-    // Generate dynamic song query using Gemini based on today's events
-    let songQuery = 'Tamil melody songs';
-    try {
-      const fallbackList = CONFIG.SONG_QUERIES?.[slot.id] || ['Tamil melody songs'];
-      const fallback = Array.isArray(fallbackList)
-        ? fallbackList[Math.floor(Math.random() * fallbackList.length)]
-        : fallbackList;
-      
-      const queryPrompt = `You are a Tamil FM radio music curator for ${dateStr}.
-Slot: "${slot.title}" | Today's content topic: "${slotData.topic || slot.id}"
-
-Check if today (${dateStr}) has any of these - and if yes, suggest songs accordingly:
-- Tamil actor birthday (Rajinikanth: Dec 12, Vijay: Jun 22, Ajith: May 1, Kamal: Nov 7, Suriya: Jul 23, Simbu: Sep 3, Dhanush: Jul 28, Vikram: Apr 17)
-- Tamil director birthday (Shankar: Aug 17, Mani Ratnam: Jun 2, Gautham Menon: Feb 25)
-- Music director birthday (AR Rahman: Jan 6, Ilaiyaraaja: Jun 2, Harris Jayaraj: Jan 13, Anirudh: Oct 16)
-- Indian festival (Pongal: Jan 14-17, Republic Day: Jan 26, Holi: March, Tamil New Year: Apr 14, Independence Day: Aug 15, Diwali: Oct-Nov, Christmas: Dec 25)
-- Tamil Nadu events, cricket matches, new movie releases this week
-
-Based on today and the slot "${slot.title}", give ONE JioSaavn-friendly search query.
-If today has a special event → use it (e.g. "Rajinikanth birthday songs", "Pongal celebration songs", "Diwali hits Tamil")
-If no special event → suggest based on slot mood and season.
-Reply with ONLY the search query. Max 6 words. No explanation.`;
-      
-      const dynamicQuery = await callGemini(queryPrompt, 50);
-      songQuery = (dynamicQuery || '').trim().split('\n')[0].replace(/["'*]/g,'').trim() || fallback;
-      console.log(`  🎵 Dynamic query: "${songQuery}"`);
-    } catch(e) {
-      songQuery = Array.isArray(fallbackList) ? fallbackList[Math.floor(Math.random() * fallbackList.length)] : 'Tamil melody songs';
-    }
+    const songVariations = SONG_QUERIES[slot.id] || [];
+    const songQuery = songVariations.length > 0
+      ? songVariations[Math.floor(Math.random() * songVariations.length)]
+      : 'Tamil melody songs';
     process.stdout.write(`  🎵 Songs "${songQuery}"... `);
     let songs = await fetchSongs(songQuery, 6, slot.id);
     // Retry if not enough songs
