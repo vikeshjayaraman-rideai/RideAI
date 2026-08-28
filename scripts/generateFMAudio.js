@@ -248,10 +248,37 @@ async function generateSlotAudio(slotId, dateStr) {
   await db.collection('jaysfm').doc(dateStr).collection('slots').doc(slotId).update({
     audioUrls,
     segments,
-    timeline,  // Pre-calculated timeline for accurate sync
+    timeline,
     totalDurationMs,
     audioGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  // Save playlist.json to Firebase Storage for fast CDN access
+  try {
+    const fullDoc = await db.collection('jaysfm').doc(dateStr).collection('slots').doc(slotId).get();
+    const fullData = fullDoc.data();
+    const playlistJson = JSON.stringify({
+      slotId,
+      dateStr,
+      totalDurationMs,
+      audioUrls,
+      playlist: fullData.playlist || [],
+      timeline,
+      generatedAt: new Date().toISOString(),
+    });
+    const jsonPath = `jayfm/data/${dateStr}/${slotId}/playlist.json`;
+    const tmpPath = require('path').join(require('os').tmpdir(), `pl_${slotId}.json`);
+    require('fs').writeFileSync(tmpPath, playlistJson);
+    await bucket.upload(tmpPath, {
+      destination: jsonPath,
+      metadata: { contentType: 'application/json', cacheControl: 'public, max-age=3600' },
+      public: true,
+    });
+    console.log(`  ✅ playlist.json saved to CDN`);
+    try { require('fs').unlinkSync(tmpPath); } catch {}
+  } catch(e) {
+    console.log(`  ⚠️ playlist.json failed: ${e.message}`);
+  }
 
   console.log(`  ✅ ${generated}/${segments.length} segments audio ready`);
   return true;
