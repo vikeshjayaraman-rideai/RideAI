@@ -1,5 +1,4 @@
-import { initializeApp, getApps } from 'firebase-admin/app';
-if (!getApps().length) initializeApp();
+
 
 export {searchSongs} from "./searchSongs";
 export {updateFMLiveState} from "./fmLiveState";

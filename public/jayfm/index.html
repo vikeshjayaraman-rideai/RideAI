@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ta">
 <head>
   <meta charset="UTF-8">
@@ -15,22 +15,25 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      padding: 0;
+      margin: 0;
     }
 
     /* Header */
     .header {
       width: 100%;
       background: #16213e;
-      padding: 16px 24px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       gap: 12px;
       border-bottom: 2px solid #FF6B35;
+      box-sizing: border-box;
     }
-    .logo { font-size: 28px; }
+    .logo img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #FF6B35; }
     .header-title { flex: 1; }
-    .header-title h1 { font-size: 20px; color: #FF6B35; font-weight: 800; }
-    .header-title p { font-size: 12px; color: #aaa; margin-top: 2px; }
+    .header-title h1 { font-size: 18px; color: #FF6B35; font-weight: 800; letter-spacing: 1px; margin: 0; }
+    .header-title p { font-size: 11px; color: #c9a96e; margin: 2px 0 0 0; font-style: italic; }
     .live-badge {
       background: #FF6B35;
       color: #fff;
@@ -46,7 +49,7 @@
     .player-card {
       width: 100%;
       max-width: 480px;
-      margin: 24px 16px;
+      margin: 12px 16px;
       background: #16213e;
       border-radius: 20px;
       overflow: hidden;
@@ -92,6 +95,18 @@
 
     /* Content area */
     .content-area { padding: 20px; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255,107,53,0.3);
+      border-top-color: #FF6B35;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
 
     .current-text {
       background: #0f3460;
@@ -220,10 +235,12 @@
 
   <!-- Header -->
   <div class="header">
-    <div class="logo">📻</div>
+    <div class="logo">
+      <img src="logo.png" alt="Jay's FM" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">
+    </div>
     <div class="header-title">
       <h1>Jay's FM</h1>
-      <p>பைக்கர்களின் குரல் — Tamil Rider Radio</p>
+      <p>Divinely Tuned. Future Ready</p>
     </div>
     <div class="live-badge" id="liveBadge">● LIVE</div>
   </div>
@@ -318,10 +335,16 @@
     audio.volume = 0.8;
 
     // ── Render Schedule ───────────────────────────────────────────────────
+    const SLOT_EMOJIS = {
+      rhythms:'🎵', rasi_palan:'⭐', morning_news:'📰', thalaivar:'👑',
+      health:'💪', movie_review:'🎬', agriculture:'🌾', travel:'🛣️',
+      local_news:'📡', weather:'🌤️', comedy:'😂', science:'🔬',
+      evening_news:'📺', horror:'👻', love:'❤️', night:'🌙', night_music:'🎶'
+    };
+
     function renderSchedule(activeSlotId) {
       const list = document.getElementById('scheduleList');
       const now = new Date();
-      // Use IST time (UTC+5:30)
       const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const hrs = ist.getHours();
       const mins = ist.getMinutes();
@@ -337,9 +360,10 @@
         // Handle overnight slots
         const isPast = !isActive && slotEnd > slotStart && slotEnd < current;
         const isUpcoming = !isActive && slotStart > current;
+        const em = {'rhythms':'🎵','rasi_palan':'⭐','morning_news':'📰','thalaivar':'👑','health':'💪','movie_review':'🎬','agriculture':'🌾','travel':'🛣️','local_news':'📡','weather':'🌤️','comedy':'😂','science':'🔬','evening_news':'📺','horror':'👻','love':'❤️','night':'🌙','night_music':'🎶'};
         return `
           <div class="slot-item ${isActive ? 'active' : ''}" style="opacity:${isPast ? '0.5' : '1'}">
-            <div class="slot-item-emoji">${slot.emoji}</div>
+            <div class="slot-item-emoji">${em[slot.id] || '📻'}</div>
             <div class="slot-item-info">
               <h4>${slot.title}</h4>
               <p>${isActive ? '▶ Now Playing' : (isPast ? '✓ Done' : `Starts ${startStr}`)}</p>
@@ -361,7 +385,7 @@
       liveState = state;
 
       // Slot info
-      document.getElementById('slotEmoji').textContent = state.slotEmoji || '📻';
+      document.getElementById('slotEmoji').textContent = state.slotEmoji || SLOT_EMOJIS[state.slotId] || '📻';
       document.getElementById('slotTitle').textContent = state.slotTitle || 'Jay\'s FM';
 
       // Item info
@@ -414,6 +438,26 @@
     }
 
     // ── Controls ──────────────────────────────────────────────────────────
+    // Media Session API - keeps audio playing when screen locks
+    function setupMediaSession(title, artist) {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: title || "Jay's FM",
+          artist: artist || 'Jay FM Tamil Radio',
+          album: 'Jay FM Live',
+        });
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (!isPlaying) togglePlay();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (isPlaying) togglePlay();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          advancePlaylist();
+        });
+      }
+    }
+
     // Remote logging to Firestore
     async function fmLog(msg) {
       console.log(msg);
@@ -445,10 +489,46 @@
       fmLog(`Advancing to index ${getIndex()} of ${getPlaylist().length}`);
       document.getElementById('currentText').textContent = `Loading item ${getIndex() + 1}...`;
       if (getIndex() >= getPlaylist().length) {
-        fmLog('Playlist complete - looping...');
-        // Loop back to beginning until slot changes
-        setIndex(0);
-        window.fmSeekMs = 0;
+        fmLog('Playlist complete');
+        // Only loop songs (not content) to fill remaining slot time
+        // Check if next slot is queued OR current slot time has passed
+        const now = new Date();
+        const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const currentMins = ist.getHours() * 60 + ist.getMinutes();
+        const currentSlot = SCHEDULE.find(s => s.id === currentSlotId);
+        const slotEndMins = currentSlot ? currentSlot.endHour * 60 + currentSlot.endMin : 0;
+        const slotExpired = slotEndMins > 0 && currentMins >= slotEndMins;
+
+        if (window.nextSlotState || slotExpired) {
+          // Next slot queued or slot time expired - transition to next slot
+          let nextState = window.nextSlotState;
+          window.nextSlotState = null;
+          
+          if (!nextState) {
+            // Find next slot from schedule
+            const nextSlot = SCHEDULE[(SCHEDULE.findIndex(s => s.id === currentSlotId) + 1) % SCHEDULE.length];
+            nextState = { slotId: nextSlot.id, slotTitle: nextSlot.title, dateStr: ist.toISOString().split('T')[0] };
+            fmLog(`Slot expired - advancing to: ${nextSlot.id}`);
+          }
+          
+          currentSlotId = nextState.slotId;
+          window.fmPlaylist = [];
+          window.fmAudioUrls = {};
+          setIndex(0);
+          Object.keys(sessionStorage).filter(k => k.startsWith('fm_cache_')).forEach(k => sessionStorage.removeItem(k));
+          playSlotTransition(nextState.slotTitle, nextState.slotId).then(() => loadFullPlaylist(nextState));
+        } else {
+          // Slot still active - play filler songs
+          const songs = getPlaylist().filter(i => i.type === 'song');
+          if (songs.length > 0) {
+            const randomSong = songs[Math.floor(Math.random() * songs.length)];
+            fmLog(`Filler song: ${randomSong.title?.substring(0,30)}`);
+            audio.src = randomSong.url;
+            audio.load();
+            if (isPlaying) audio.play().catch(() => {});
+            setupMediaSession(randomSong.title, randomSong.artist);
+          }
+        }
       }
       const item = getPlaylist()[getIndex()];
       fmLog(`Playing item ${getIndex()}: type=${item?.type}`);
@@ -473,6 +553,12 @@
     function playItem(item) {
       if (!item) { fmLog('playItem: item is null!'); return; }
       fmLog(`playItem: type=${item.type} segIndex=${item.segIndex} isPlaying=${isPlaying}`);
+      // Update media session for lock screen controls
+      if (item.type === 'content') {
+        setupMediaSession("Jay's FM - " + (document.getElementById('slotTitle')?.textContent || ''), 'Jay FM');
+      } else if (item.type === 'song') {
+        setupMediaSession(item.title || 'Song', item.artist || 'Jay FM');
+      }
       document.getElementById('itemType').textContent = item.type === 'song' ? '🎵 Music' : '🎙️ Jay Speaking';
       if (item.type === 'content') {
         document.getElementById('currentText').textContent = item.text || '';
@@ -522,8 +608,34 @@ ${item.artist || ''}`;
       }
     }
 
+    // Calculate position from 6AM master clock
+    function getMasterPosition() {
+      const now = new Date();
+      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      
+      // Total minutes elapsed since 6AM today
+      let totalMins = ist.getHours() * 60 + ist.getMinutes() - (6 * 60);
+      if (totalMins < 0) totalMins += 24 * 60; // Handle past midnight
+      
+      // Find which slot we're in based on cumulative durations
+      let accumulated = 0;
+      for (const slot of SCHEDULE) {
+        const startMins = slot.startHour * 60 + slot.startMin - (6 * 60);
+        const adjustedStart = startMins < 0 ? startMins + 24 * 60 : startMins;
+        let endMins = slot.endHour * 60 + slot.endMin - (6 * 60);
+        const adjustedEnd = endMins < 0 ? endMins + 24 * 60 : endMins;
+        const duration = adjustedEnd > adjustedStart ? adjustedEnd - adjustedStart : adjustedEnd + 24*60 - adjustedStart;
+        
+        if (totalMins >= adjustedStart && totalMins < adjustedStart + duration) {
+          const elapsedInSlot = (totalMins - adjustedStart) * 60 * 1000; // ms
+          return { slotId: slot.id, slotTitle: slot.title, elapsedMs: elapsedInSlot };
+        }
+      }
+      return { slotId: SCHEDULE[0].id, slotTitle: SCHEDULE[0].title, elapsedMs: 0 };
+    }
+
     // Load full playlist from Firestore
-    async function loadFullPlaylist(state) {
+    async function loadFullPlaylist(state, retryCount = 0) {
       try {
         const dateStr = state.dateStr || new Date().toISOString().split('T')[0];
         const cacheKey = `fm_cache_${state.slotId}_${dateStr}`;
@@ -531,11 +643,18 @@ ${item.artist || ''}`;
         // Try cache first for fast load
         let data = null;
         const cached = sessionStorage.getItem(cacheKey);
-        if (cached) {
+        const cachedTs = sessionStorage.getItem(cacheKey + '_ts');
+        const cacheAge = cachedTs ? Date.now() - parseInt(cachedTs) : Infinity;
+        // Use cache only if less than 30 mins old
+        if (cached && cacheAge < 30 * 60 * 1000) {
           try {
             data = JSON.parse(cached);
-            fmLog(`Cache hit: ${state.slotId}`);
+            fmLog(`Cache hit: ${state.slotId} (${Math.round(cacheAge/60000)}min old)`);
           } catch {}
+        } else if (cached) {
+          sessionStorage.removeItem(cacheKey);
+          sessionStorage.removeItem(cacheKey + '_ts');
+          fmLog(`Cache expired for ${state.slotId} - fetching fresh`);
         }
         
         if (!data) {
@@ -546,7 +665,10 @@ ${item.artist || ''}`;
           if (!slotDoc.exists()) return;
           data = slotDoc.data();
           // Cache for 1 hour
-          try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch {}
+          try { 
+            sessionStorage.setItem(cacheKey, JSON.stringify(data));
+            sessionStorage.setItem(cacheKey + '_ts', Date.now().toString());
+          } catch {}
         }
         
         if (data) {
@@ -558,10 +680,11 @@ ${item.artist || ''}`;
           let startIndex = 0;
           let seekPositionMs = 0;
           
-          if (state.slotStartedAt) {
-            const slotStartMs = state.slotStartedAt.toMillis ? state.slotStartedAt.toMillis() : Date.now();
-            const elapsedMs = Date.now() - slotStartMs;
-            fmLog(`Slot elapsed: ${Math.round(elapsedMs/1000)}s`);
+          // Use master 6AM clock for accurate position
+          const masterPos = getMasterPosition();
+          const elapsedMs = masterPos.slotId === state.slotId ? masterPos.elapsedMs : 0;
+          fmLog(`Master clock: slot=${masterPos.slotId} elapsed=${Math.round(elapsedMs/1000)}s`);
+          if (true) { // always use master clock
             
             // Use pre-calculated timeline if available
             const timeline = data.timeline;
@@ -574,26 +697,7 @@ ${item.artist || ''}`;
                   break;
                 }
               }
-              fmLog(`Timeline sync: item=${startIndex} seekPos=${Math.round(seekPositionMs/1000)}s`);
-            } else {
-              // Fallback: estimate from text length
-              let accumulated = 0;
-              for (let i = 0; i < getPlaylist().length; i++) {
-                const item = getPlaylist()[i];
-                const dur = item.type === 'content'
-                  ? (item.audioDuration || (item.text?.length || 500) * 0.3) * 1000
-                  : (item.duration || 180) * 1000;
-                if (accumulated + dur > elapsedMs) {
-                  startIndex = i;
-                  seekPositionMs = elapsedMs - accumulated;
-                  break;
-                }
-                accumulated += dur;
-                startIndex = i + 1;
-              }
-              startIndex = Math.min(startIndex, getPlaylist().length - 1);
-              fmLog(`Estimated: item=${startIndex} seekPos=${Math.round(seekPositionMs/1000)}s`);
-            }
+              fmLog(`Timeline: item=${startIndex} seekPos=${Math.round(seekPositionMs/1000)}s`);
           }
 
           setIndex(startIndex);
@@ -613,6 +717,16 @@ ${item.artist || ''}`;
         }
       } catch (e) {
         fmLog(`Playlist load error: ${e.message}`);
+        // Retry up to 3 times with delay
+        if (retryCount < 3) {
+          fmLog(`Retrying... (${retryCount + 1}/3)`);
+          document.getElementById('status').textContent = `Loading... retry ${retryCount + 1}/3`;
+          await new Promise(r => setTimeout(r, 2000));
+          await loadFullPlaylist(state, retryCount + 1);
+        } else {
+          document.getElementById('status').textContent = 'Failed to load - tap play to retry';
+          document.getElementById('currentText').textContent = 'Connection error. Please try again.';
+        }
       }
     }
 
@@ -663,11 +777,11 @@ ${item.artist || ''}`;
           const item = getPlaylist()[getIndex()];
           fmLog(`Starting item: type=${item?.type} segIndex=${item?.segIndex}`);
           playItemAtPosition(item, window.fmSeekMs || 0);
-          window.fmSeekMs = 0; // Clear after first play
+          window.fmSeekMs = 0;
         } else {
           fmLog('Playlist loading - will auto-start when ready');
-          document.getElementById('status').textContent = 'Loading... please wait';
-          // Auto-start when playlist loads (handled in loadFullPlaylist)
+          document.getElementById('status').textContent = 'Loading content... tap play again in a few seconds';
+          document.getElementById('currentText').textContent = 'Please wait, loading Jay FM...';
         }
       }
     };
@@ -703,6 +817,20 @@ ${item.artist || ''}`;
       fmLog(`ended fired index=${getIndex()} of ${getPlaylist().length}`);
       advancePlaylist();
     });
+    
+    // Also handle when audio stalls (mobile issue)
+    audio.addEventListener('stalled', () => {
+      fmLog('Audio stalled - retrying...');
+      setTimeout(() => {
+        if (isPlaying && audio.paused) {
+          audio.play().catch(() => advancePlaylist());
+        }
+      }, 3000);
+    });
+    
+    audio.addEventListener('waiting', () => {
+      // Buffering - not an error, just wait
+    });
     audio.addEventListener('error', () => {
       fmLog(`Audio error - skipping index=${getIndex()}`);
       advancePlaylist();
@@ -729,6 +857,86 @@ ${item.artist || ''}`;
 
     // ── Listen to Firestore live state ────────────────────────────────────
     const liveRef = doc(db, 'jaysfm_live', 'now_playing');
+    // SFX query per slot for transition
+    const SLOT_SFX_QUERIES = {
+      rhythms: 'morning bell chime instrumental',
+      rasi_palan: 'temple bell mystical',
+      morning_news: 'news radio jingle',
+      thalaivar: 'trumpet fanfare heroic',
+      health: 'upbeat chime positive',
+      movie_review: 'cinema bell dramatic',
+      agriculture: 'flute folk instrumental',
+      travel: 'adventure road trip bgm',
+      local_news: 'news bulletin short',
+      weather: 'nature ambient chime',
+      comedy: 'comedy circus fun music',
+      science: 'electronic space ambient',
+      evening_news: 'evening news theme',
+      horror: 'suspense dark chime',
+      love: 'romantic piano soft',
+      night: 'night jazz ambient',
+      night_music: 'soft lullaby night',
+    };
+
+    async function playSlotTransition(newSlotTitle, newSlotId) {
+      try {
+        // Step 1: Play preview from current slot's songs as transition music
+        try {
+          // Get a song from current playlist
+          const currentSongs = getPlaylist().filter(i => i.type === 'song' && i.url);
+          const transitionSong = currentSongs[Math.floor(Math.random() * currentSongs.length)];
+          if (transitionSong?.url) {
+            const sfxAudio = new Audio(transitionSong.url);
+            sfxAudio.volume = 0.4;
+            sfxAudio.play().catch(() => {});
+            await new Promise(r => setTimeout(r, 6000)); // Play 6 seconds
+            sfxAudio.pause();
+          }
+        } catch(e) {}
+
+        // Step 2: Web Audio jingle chime
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const tones = [440, 550, 660, 880];
+          for (let i = 0; i < tones.length; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = tones[i];
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.3);
+            osc.start(ctx.currentTime + i * 0.15);
+            osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+          }
+          await new Promise(r => setTimeout(r, 700));
+        } catch(e) {}
+
+        // Step 3: Jay announces next slot in Tamil
+        if (window.speechSynthesis && newSlotTitle) {
+          window.speechSynthesis.cancel();
+          const ann = new SpeechSynthesisUtterance(
+            `Jay FM-ல் இப்போது ${newSlotTitle} நிகழ்ச்சி தொடங்குகிறது! கேளுங்கள்!`
+          );
+          ann.lang = 'ta-IN';
+          ann.rate = 1.0;
+          ann.pitch = 1.1;
+          window.speechSynthesis.speak(ann);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      } catch(e) {
+        console.log('Transition skipped:', e.message);
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    // Clear ALL stale data on page load - always fresh start
+    sessionStorage.clear();
+    window.fmPlaylist = [];
+    window.fmAudioUrls = {};
+    fmLog('Full reset on page load');
+
     // Load live state immediately on page open
     async function initPortal() {
       try {
@@ -737,7 +945,7 @@ ${item.artist || ''}`;
         if (liveSnap.exists()) {
           const state = liveSnap.data();
           fmLog(`Live state: slot=${state.slotId}`);
-          document.getElementById('slotEmoji').textContent = state.slotEmoji || '📻';
+          document.getElementById('slotEmoji').textContent = state.slotEmoji || SLOT_EMOJIS[state.slotId] || '📻';
           document.getElementById('slotTitle').textContent = state.slotTitle || "Jay's FM";
           currentSlotId = state.slotId;
           renderSchedule(state.slotId);
@@ -758,11 +966,23 @@ ${item.artist || ''}`;
         renderSchedule(state.slotId);
         document.getElementById('status').textContent = `Live: ${state.slotTitle} • ${new Date().toLocaleTimeString()}`;
         if (state.slotId !== currentSlotId) {
-          currentSlotId = state.slotId;
-          window.fmPlaylist = [];
-          setIndex(0);
-          fmLog(`Slot changed: ${state.slotId}`);
-          loadFullPlaylist(state);
+          fmLog(`Schedule: slot changed to ${state.slotId} (current playing: ${currentSlotId})`);
+          // Don't interrupt active playback - queue next slot
+          window.nextSlotState = state;
+          
+          if (!isPlaying || getPlaylist().length === 0) {
+            // Not playing - load new slot immediately
+            currentSlotId = state.slotId;
+            window.fmPlaylist = [];
+            window.fmAudioUrls = {};
+            setIndex(0);
+            window.fmSeekMs = 0;
+            Object.keys(sessionStorage).filter(k => k.startsWith('fm_cache_')).forEach(k => sessionStorage.removeItem(k));
+            playSlotTransition(state.slotTitle, state.slotId).then(() => loadFullPlaylist(state));
+          } else {
+            fmLog(`Queued next slot: ${state.slotId} - current will finish first`);
+            document.getElementById('status').textContent = `Next: ${state.slotTitle} (queued)`;
+          }
         }
       }
     });

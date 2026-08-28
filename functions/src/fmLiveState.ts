@@ -52,19 +52,34 @@ export const updateFMLiveState = onSchedule({
   const liveDoc = await db.collection('jaysfm_live').doc('now_playing').get();
   const liveData = liveDoc.exists ? liveDoc.data()! : {};
   const currentSlotId = liveData.slotId;
-  const isComplete = liveData.playlistComplete === true;
-  const slotChanged = currentSlotId !== targetSlot.id || isComplete;
+
+  // Always advance to scheduled slot based on time (don't wait for playlistComplete)
+  const slotChanged = currentSlotId !== targetSlot.id;
 
   if (slotChanged) {
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    
+    // slotStartedAt = max(scheduled start time, current time)
+    // If previous slot overran, new slot effectively starts NOW
+    // If we're exactly on time, use scheduled start time
+    const scheduledStart = new Date(ist);
+    scheduledStart.setHours(targetSlot.startHour, targetSlot.startMin, 0, 0);
+    if (scheduledStart > ist) scheduledStart.setDate(scheduledStart.getDate() - 1);
+
+    // Use scheduled start if we're within 2 mins of it, otherwise use now
+    // This handles overrun: if thalaivar ran late, health starts from now
+    const diffMs = ist.getTime() - scheduledStart.getTime();
+    const slotStartActual = diffMs < 2 * 60 * 1000 ? scheduledStart : ist;
+
     await db.collection('jaysfm_live').doc('now_playing').set({
       slotId: targetSlot.id,
       slotTitle: targetSlot.title,
       dateStr,
-      slotStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+      slotStartedAt: admin.firestore.Timestamp.fromDate(slotStartActual),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       playlistComplete: false,
     });
-    console.log(`New slot: ${targetSlot.id}`);
+    console.log(`Slot: ${targetSlot.id} started at ${slotStartActual.toLocaleTimeString()} (scheduled: ${scheduledStart.toLocaleTimeString()})`);
   } else {
     await db.collection('jaysfm_live').doc('now_playing').update({
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
