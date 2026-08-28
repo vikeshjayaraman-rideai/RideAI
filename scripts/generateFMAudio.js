@@ -202,25 +202,32 @@ async function generateSlotAudio(slotId, dateStr) {
     const fillerSongsNeeded = Math.ceil(fillerNeededMs / (180 * 1000)); // ~3min per song
     
     try {
-      const fillerQueries = ['Tamil melody instrumental', 'Tamil BGM music', 'Tamil soft songs'];
+      const CF_URL = 'https://asia-southeast1-rideai-84dff.cloudfunctions.net/searchSongs';
+      const fillerQueries = ['Tamil melody instrumental', 'Tamil BGM music', 'Tamil soft songs',
+                             'Tamil chill songs', 'Tamil peaceful melody', 'Tamil relaxing songs'];
       const fillerSongs = [];
-      const seenTitles = new Set(playlist.filter(i => i.type === 'song').map(i => 
-        i.title?.toLowerCase().replace(/[^a-z]/g,'').substring(0,15)
-      ));
+      // Track ALL songs already in playlist to avoid duplicates
+      const usedTitles = new Set(playlist.filter(i => i.type === 'song')
+        .map(s => (s.title || '').toLowerCase().replace(/[^a-z]/g,'').substring(0,15)));
       
       for (const query of fillerQueries) {
         if (fillerSongs.length >= fillerSongsNeeded) break;
-        const res = await fetch(`${CLOUD_FUNCTION_URL}?query=${encodeURIComponent(query)}&count=10`);
-        const json = await res.json();
-        const songs = (json.songs || []).filter(s => {
-          const key = s.title?.toLowerCase().replace(/[^a-z]/g,'').substring(0,15);
-          return s.url && !seenTitles.has(key);
-        });
-        for (const s of songs) {
-          if (fillerSongs.length >= fillerSongsNeeded) break;
-          const key = s.title?.toLowerCase().replace(/[^a-z]/g,'').substring(0,15);
-          seenTitles.add(key);
-          fillerSongs.push(s);
+        try {
+          const res = await fetch(`${CF_URL}?query=${encodeURIComponent(query)}&count=10`);
+          const json = await res.json();
+          const songs = (json.songs || []).filter(s => {
+            const key = (s.title || '').toLowerCase().replace(/[^a-z]/g,'').substring(0,15);
+            return s.url && key.length > 2 && !usedTitles.has(key);
+          });
+          for (const s of songs) {
+            if (fillerSongs.length >= fillerSongsNeeded) break;
+            const key = (s.title || '').toLowerCase().replace(/[^a-z]/g,'').substring(0,15);
+            usedTitles.add(key);
+            fillerSongs.push(s);
+          }
+          console.log(`  Filler query "${query}": ${songs.length} fresh songs`);
+        } catch(e) {
+          console.log(`  Filler query failed: ${e.message}`);
         }
       }
       
