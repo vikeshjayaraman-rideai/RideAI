@@ -86,30 +86,30 @@ jobs:
         run: node scripts/generateFMAudio.js --today --morning
 
       - name: Afternoon 1 - local_news, weather
-        if: github.event.schedule == '30 5 * * *' || github.event.inputs.task == 'afternoon1'
+        if: github.event.schedule == '30 7 * * *' || github.event.inputs.task == 'afternoon1'
         run: |
           node scripts/generateJayFMContent.js --today --slot=local_news
           node scripts/generateJayFMContent.js --today --slot=weather
 
       - name: Afternoon 2 - comedy, science
-        if: github.event.schedule == '45 5 * * *' || github.event.inputs.task == 'afternoon2'
+        if: github.event.schedule == '45 7 * * *' || github.event.inputs.task == 'afternoon2'
         run: |
           node scripts/generateJayFMContent.js --today --slot=comedy
           node scripts/generateJayFMContent.js --today --slot=science
 
       - name: Afternoon 3 - evening_news, horror
-        if: github.event.schedule == '0 6 * * *' || github.event.inputs.task == 'afternoon3'
+        if: github.event.schedule == '0 8 * * *' || github.event.inputs.task == 'afternoon3'
         run: |
           node scripts/generateJayFMContent.js --today --slot=evening_news
           node scripts/generateJayFMContent.js --today --slot=horror
 
       - name: Afternoon 4 - love, night, night_music
-        if: github.event.schedule == '15 6 * * *' || github.event.inputs.task == 'afternoon4'
+        if: github.event.schedule == '15 8 * * *' || github.event.inputs.task == 'afternoon4'
         run: |
           node scripts/generateJayFMContent.js --today --slot=love
           node scripts/generateJayFMContent.js --today --slot=night
           node scripts/generateJayFMContent.js --today --slot=night_music
 
       - name: Afternoon Audio
-        if: github.event.schedule == '30 6 * * *' || github.event.inputs.task == 'afternoon_audio'
+        if: github.event.schedule == '30 8 * * *' || github.event.inputs.task == 'afternoon_audio'
         run: node scripts/generateFMAudio.js --today --afternoon
