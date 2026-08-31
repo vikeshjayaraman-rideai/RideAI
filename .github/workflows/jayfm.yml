@@ -7,11 +7,11 @@ on:
     - cron: '0 0 * * *'    # 5:30 AM IST - health, movie_review
     - cron: '15 0 * * *'   # 5:45 AM IST - agriculture, travel
     - cron: '30 0 * * *'   # 6:00 AM IST - morning audio
-    - cron: '30 7 * * *'   # 1:00 PM IST - local_news, weather
-    - cron: '45 7 * * *'   # 1:15 PM IST - comedy, science
-    - cron: '0 8 * * *'    # 1:30 PM IST - evening_news, horror
-    - cron: '15 8 * * *'   # 1:45 PM IST - love, night, night_music
-    - cron: '30 8 * * *'   # 2:00 PM IST - afternoon audio
+    - cron: '30 8 * * *'   # 2:00 PM IST - local_news, weather
+    - cron: '45 8 * * *'   # 2:15 PM IST - comedy, science
+    - cron: '0 9 * * *'    # 2:30 PM IST - evening_news, horror
+    - cron: '15 9 * * *'   # 2:45 PM IST - love, night, night_music
+    - cron: '30 9 * * *'   # 3:00 PM IST - afternoon audio
   workflow_dispatch:
     inputs:
       task:
@@ -86,30 +86,30 @@ jobs:
         run: node scripts/generateFMAudio.js --today --morning
 
       - name: Afternoon 1 - local_news, weather
-        if: github.event.schedule == '30 7 * * *' || github.event.inputs.task == 'afternoon1'
+        if: github.event.schedule == '30 8 * * *' || github.event.inputs.task == 'afternoon1'
         run: |
           node scripts/generateJayFMContent.js --today --slot=local_news
           node scripts/generateJayFMContent.js --today --slot=weather
 
       - name: Afternoon 2 - comedy, science
-        if: github.event.schedule == '45 7 * * *' || github.event.inputs.task == 'afternoon2'
+        if: github.event.schedule == '45 8 * * *' || github.event.inputs.task == 'afternoon2'
         run: |
           node scripts/generateJayFMContent.js --today --slot=comedy
           node scripts/generateJayFMContent.js --today --slot=science
 
       - name: Afternoon 3 - evening_news, horror
-        if: github.event.schedule == '0 8 * * *' || github.event.inputs.task == 'afternoon3'
+        if: github.event.schedule == '0 9 * * *' || github.event.inputs.task == 'afternoon3'
         run: |
           node scripts/generateJayFMContent.js --today --slot=evening_news
           node scripts/generateJayFMContent.js --today --slot=horror
 
       - name: Afternoon 4 - love, night, night_music
-        if: github.event.schedule == '15 8 * * *' || github.event.inputs.task == 'afternoon4'
+        if: github.event.schedule == '15 9 * * *' || github.event.inputs.task == 'afternoon4'
         run: |
           node scripts/generateJayFMContent.js --today --slot=love
           node scripts/generateJayFMContent.js --today --slot=night
           node scripts/generateJayFMContent.js --today --slot=night_music
 
       - name: Afternoon Audio
-        if: github.event.schedule == '30 8 * * *' || github.event.inputs.task == 'afternoon_audio'
+        if: github.event.schedule == '30 9 * * *' || github.event.inputs.task == 'afternoon_audio'
         run: node scripts/generateFMAudio.js --today --afternoon
