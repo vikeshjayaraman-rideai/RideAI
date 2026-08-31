@@ -7,11 +7,11 @@ on:
     - cron: '0 0 * * *'    # 5:30 AM IST - health, movie_review
     - cron: '15 0 * * *'   # 5:45 AM IST - agriculture, travel
     - cron: '30 0 * * *'   # 6:00 AM IST - morning audio
-    - cron: '30 5 * * *'   # 11:00 AM IST - local_news, weather
-    - cron: '45 5 * * *'   # 11:15 AM IST - comedy, science
-    - cron: '0 6 * * *'    # 11:30 AM IST - evening_news, horror
-    - cron: '15 6 * * *'   # 11:45 AM IST - love, night, night_music
-    - cron: '30 6 * * *'   # 12:00 PM IST - afternoon audio
+    - cron: '30 7 * * *'   # 1:00 PM IST - local_news, weather
+    - cron: '45 7 * * *'   # 1:15 PM IST - comedy, science
+    - cron: '0 8 * * *'    # 1:30 PM IST - evening_news, horror
+    - cron: '15 8 * * *'   # 1:45 PM IST - love, night, night_music
+    - cron: '30 8 * * *'   # 2:00 PM IST - afternoon audio
   workflow_dispatch:
     inputs:
       task:
