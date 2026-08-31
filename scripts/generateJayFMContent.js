@@ -845,10 +845,29 @@ async function main() {
       } else {
         console.log(`🤖 API unavailable - Gemini will generate predictions`);
       }
+    } else if (slot.contentType === 'spiritual') {
+      topic = 'spiritual';
+      console.log('(spiritual - segment-based)');
     } else {
       process.stdout.write('picking topic... ');
       topic = await pickTopicOfDay(slot.contentType, dateStr);
-      console.log(`"${topic.substring(0,60)}"`);
+      // If Gemini returns generic topic, use fallback
+      const genericTopics = ['love content', 'night content', 'horror content', 'comedy content', 'health content', 'science content'];
+      if (!topic || genericTopics.some(g => topic.toLowerCase().includes(g.split(' ')[0]))) {
+        const fallbackTopics = {
+          love: ['ஒரு உண்மை காதல் கதை', 'திருமண வாழ்க்கை', 'தாய் அன்பு', 'நட்பு காதல்', 'கடிதம் எழுதிய காதல்'],
+          night: ['வாழ்க்கை பாடங்கள்', 'இரவு தியானம்', 'கனவுகள் மற்றும் இலக்குகள்', 'நன்றி உணர்வு', 'அமைதியான சிந்தனைகள்'],
+          horror: ['தமிழ்நாட்டு பேய் கதை', 'காட்டு மர்மம்', 'கோட்டை ரகசியம்', 'மருத்துவமனை மர்மம்', 'கடல் மர்மம்'],
+          comedy: ['அலுவலக நகைச்சுவை', 'திருமண நகைச்சுவை', 'பேருந்து நகைச்சுவை', 'அரசியல் நகைச்சுவை', 'சமையல் நகைச்சுவை'],
+          health: ['யோகா நன்மைகள்', 'ஆரோக்கிய உணவு', 'தூக்கம் முக்கியத்துவம்', 'மன அமைதி', 'நடைப்பயிற்சி நன்மைகள்'],
+          science: ['செவ்வாய் கிரகம்', 'செயற்கை நுண்ணறிவு', 'கடல் ஆழம்', 'மூளை அதிசயங்கள்', 'விண்வெளி ஆராய்ச்சி'],
+        };
+        const pool = fallbackTopics[slot.contentType] || fallbackTopics.night;
+        topic = pool[Math.floor(Math.random() * pool.length)];
+        console.log(`(fallback topic: "${topic}")`);
+      } else {
+        console.log(`"${topic.substring(0,60)}"`);
+      }
     }
     console.log('─'.repeat(55));
 
