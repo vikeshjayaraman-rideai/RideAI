@@ -215,18 +215,8 @@ async function searchDeezer(query, count = 20) {
 }
 
 const serviceAccount = require(path.join(__dirname, '..', 'google-services-admin.json'));
-admin.initializeApp({ 
-  credential: admin.credential.cert(serviceAccount),
-  projectId: serviceAccount.project_id,
-});
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
-db.settings({ 
-  projectId: serviceAccount.project_id,
-  credentials: {
-    client_email: serviceAccount.client_email,
-    private_key: serviceAccount.private_key,
-  }
-});
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI?.MODEL || 'gemini-flash-latest'}:generateContent`;
 const CLOUD_FUNCTION_URL = 'https://asia-southeast1-rideai-84dff.cloudfunctions.net/searchSongs';
