@@ -58,6 +58,13 @@ jobs:
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           echo "Key written to .env: $(wc -c < .env) bytes" 
 
+      - name: Debug credentials
+        run: |
+          ls -la google-services-admin.json || echo "FILE NOT FOUND"
+          node -e "try{const sa=require('./google-services-admin.json');console.log('OK:',sa.project_id,sa.client_email?.substring(0,30));}catch(e){console.log('ERROR:',e.message);}"
+                    echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS"
+          cat google-services-admin.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('Valid JSON, project:', d.get('project_id'))"
+          
       - name: Morning 1 - rhythms, rasi_palan
         if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning1'
         env:
