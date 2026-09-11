@@ -57,6 +57,11 @@ jobs:
           echo "$GOOGLE_SERVICE_ACCOUNT" | base64 --decode > google-services-admin.json
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           echo "Key written to .env: $(wc -c < .env) bytes" 
+      
+      - name: Debug credentials
+        run: |
+          ls -la google-services-admin.json || echo "FILE NOT FOUND"
+          node -e "try{const sa=require('./google-services-admin.json');console.log('OK:',sa.project_id,sa.client_email?.substring(0,30));}catch(e){console.log('ERROR:',e.message);}"
 
       - name: Morning 1 - rhythms, rasi_palan
         if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning1'
@@ -67,11 +72,7 @@ jobs:
           node scripts/generateJayFMContent.js --today --slot=rhythms
           node scripts/generateJayFMContent.js --today --slot=rasi_palan
 
-                - name: Debug credentials
-        run: |
-          ls -la google-services-admin.json
-          node -e "const sa=require('./google-services-admin.json'); console.log('Project:', sa.project_id, 'Email:', sa.client_email?.substring(0,20));"
-
+        
       - name: Morning 1 Audio
         if: github.event.schedule == '45 23 * * *' || github.event.inputs.task == 'morning2'
         run: node scripts/generateFMAudio.js --today --slots=rhythms,rasi_palan
