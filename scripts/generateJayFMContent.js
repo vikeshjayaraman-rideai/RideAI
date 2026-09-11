@@ -218,7 +218,7 @@ const serviceAccount = require(path.join(__dirname, '..', 'google-services-admin
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 const CLOUD_FUNCTION_URL = 'https://asia-southeast1-rideai-84dff.cloudfunctions.net/searchSongs';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -876,6 +876,7 @@ async function main() {
     let prevScript = '';
     const usedHeadlines = new Set(); // Fresh set per slot - no repeated headlines
     for (let i = 0; i < slot.segments; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 4000)); // 4s delay between calls
       process.stdout.write(`  Segment ${i+1}/${slot.segments}... `);
       const script = await generateSegment(slot, i, topic, prevScript, dateStr, usedHeadlines);
       if (script) {
