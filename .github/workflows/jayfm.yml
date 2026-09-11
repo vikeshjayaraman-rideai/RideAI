@@ -53,22 +53,25 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_B64 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "$GOOGLE_SERVICE_ACCOUNT" | base64 --decode > google-services-admin.json
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/google-services-admin.json" >> "$GITHUB_ENV"
+          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/google-services-admin.json
           echo "Key written to .env: $(wc -c < .env) bytes" 
 
       - name: Debug credentials
         run: |
           ls -la google-services-admin.json || echo "FILE NOT FOUND"
-          node -e "try{const sa=require('./google-services-admin.json');console.log('OK:',sa.project_id,sa.client_email?.substring(0,30));}catch(e){console.log('ERROR:',e.message);}"
-                    echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS"
-          cat google-services-admin.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('Valid JSON, project:', d.get('project_id'))"
-          
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS"
+          node -e "try{const sa=require('./google-services-admin.json');console.log('OK:',sa.project_id);}catch(e){console.log('ERROR:',e.message);}"
+
       - name: Morning 1 - rhythms, rasi_palan
         if: github.event.schedule == '30 23 * * *' || github.event.inputs.task == 'morning1'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=rhythms
@@ -82,6 +85,7 @@ jobs:
         if: github.event.schedule == '45 23 * * *' || github.event.inputs.task == 'morning2'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=morning_news
@@ -91,6 +95,7 @@ jobs:
         if: github.event.schedule == '0 0 * * *' || github.event.inputs.task == 'morning3'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=health
@@ -104,6 +109,7 @@ jobs:
         if: github.event.schedule == '15 0 * * *' || github.event.inputs.task == 'morning4'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=agriculture
@@ -117,6 +123,7 @@ jobs:
         if: github.event.schedule == '30 8 * * *' || github.event.inputs.task == 'afternoon1'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=local_news
@@ -130,6 +137,7 @@ jobs:
         if: github.event.schedule == '45 8 * * *' || github.event.inputs.task == 'afternoon2'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=comedy
@@ -143,6 +151,7 @@ jobs:
         if: github.event.schedule == '0 9 * * *' || github.event.inputs.task == 'afternoon3'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=evening_news
@@ -156,6 +165,7 @@ jobs:
         if: github.event.schedule == '15 9 * * *' || github.event.inputs.task == 'afternoon4'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-services-admin.json
         run: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
           node scripts/generateJayFMContent.js --today --slot=love
