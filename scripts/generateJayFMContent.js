@@ -218,7 +218,7 @@ const serviceAccount = require(path.join(__dirname, '..', 'google-services-admin
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI?.MODEL || 'gemini-flash-latest'}:generateContent`;
 const CLOUD_FUNCTION_URL = 'https://asia-southeast1-rideai-84dff.cloudfunctions.net/searchSongs';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -270,7 +270,7 @@ async function callGemini(prompt, minLength = 100) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.9, maxOutputTokens: 1500 },
+          generationConfig: { temperature: CONFIG.GEMINI?.TEMPERATURE || 0.9, maxOutputTokens: CONFIG.GEMINI?.MAX_OUTPUT_TOKENS || 2048 },
         }),
       });
       if (res.status === 503) { await sleep((attempt+1)*10000); continue; }
@@ -283,7 +283,8 @@ async function callGemini(prompt, minLength = 100) {
       const data = await res.json();
       if (res.status !== 200) { console.log('\n  ❌', res.status, JSON.stringify(data).substring(0,80)); continue; }
       const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-      if (text.length < minLength) { process.stdout.write(`short(${text.length})... `); await sleep(3000); continue; }
+      const minLen = minLength || CONFIG.GEMINI?.MIN_CONTENT_LENGTH || 150;
+      if (text.length < minLen) { process.stdout.write(`short(${text.length})... `); continue; }
       return text;
     } catch(e) { console.log('\n  ❌', e.message); await sleep(5000); }
   }
@@ -700,7 +701,7 @@ Write in pure Tamil. Minimum 500 characters. Warm closing style.`;
     (isNews ? `\nNEWS CATEGORY: ${feedType.replace('_',' ').toUpperCase()} NEWS\n` : '') +
     realNewsContext + extraContext + '\n' +
     '\nCONTENT INSTRUCTIONS:\n' + contentDirection + '\n' +
-    '\nMINIMUM: 1000 characters. Be detailed.\n' +
+    '\nCRITICAL: Write MINIMUM 1000 Tamil characters. Do NOT stop before 1000 characters. Be very detailed, give examples, stories, explanations.\n' +
     (isFirst && !isNews ? 'OPENING segment - welcome listeners warmly.\n' : '') +
     (isFirst && isNews ? 'Start directly with first news story - no long intro needed, just brief welcome and dive into news.\n' : '') +
     (isLast ? 'CLOSING segment - end with energy.\n' : '') +

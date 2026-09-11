@@ -294,6 +294,7 @@ async function generateSlotAudio(slotId, dateStr) {
 async function main() {
   const args = process.argv.slice(2);
   const slotArg = args.find(a => a.startsWith('--slot='))?.split('=')[1];
+  const slotsArg = args.find(a => a.startsWith('--slots='))?.split('=')[1];
   const morning = args.includes('--morning');
   const afternoon = args.includes('--afternoon');
   const all = args.includes('--all') || args.includes('--today');
